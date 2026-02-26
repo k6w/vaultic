@@ -3,6 +3,33 @@ import { scanPageForQRAsync, scanSingleImageUrl } from './qr-scanner';
 import { showToast, showNoQRToast } from './toast';
 import type { TwoFactorAccount } from '../shared/types';
 
+/**
+ * Extract the page's favicon URL from <link> elements,
+ * falling back to /favicon.ico at the current origin.
+ */
+function getPageFavicon(): string {
+  const iconLink = document.querySelector<HTMLLinkElement>(
+    'link[rel="icon"], link[rel="shortcut icon"]',
+  );
+  if (iconLink?.href) {
+    return iconLink.href;
+  }
+  return `${location.origin}/favicon.ico`;
+}
+
+/**
+ * Enrich a detected account with page context:
+ * - Use the page hostname as issuer if the QR URI didn't provide one
+ * - Always attach the page's favicon as the account icon
+ */
+function enrichAccount(account: Partial<TwoFactorAccount>): Partial<TwoFactorAccount> {
+  return {
+    ...account,
+    issuer: account.issuer || location.hostname,
+    icon: getPageFavicon(),
+  };
+}
+
 // Listen for messages from background (manual scan / image scan trigger)
 browser.runtime.onMessage.addListener((message: any) => {
   if (message.type === 'SCAN_PAGE_QR') {
@@ -23,8 +50,10 @@ async function autoDetect() {
     await new Promise(r => setTimeout(r, 3000));
 
     const accounts = await scanPageForQRAsync(false);
-    for (const account of accounts) {
-      const shouldSave = await showToast(account);
+    const domain = location.hostname;
+    for (const raw of accounts) {
+      const account = enrichAccount(raw);
+      const shouldSave = await showToast(account, domain);
       if (shouldSave) {
         await saveAccount(account);
       }
@@ -43,8 +72,10 @@ async function handleManualScan() {
     return;
   }
 
-  for (const account of accounts) {
-    const shouldSave = await showToast(account);
+  const domain = location.hostname;
+  for (const raw of accounts) {
+    const account = enrichAccount(raw);
+    const shouldSave = await showToast(account, domain);
     if (shouldSave) {
       await saveAccount(account);
     }
@@ -52,14 +83,16 @@ async function handleManualScan() {
 }
 
 async function handleSingleImageScan(srcUrl: string) {
-  const account = await scanSingleImageUrl(srcUrl);
+  const raw = await scanSingleImageUrl(srcUrl);
 
-  if (!account) {
+  if (!raw) {
     showNoQRToast();
     return;
   }
 
-  const shouldSave = await showToast(account);
+  const account = enrichAccount(raw);
+  const domain = location.hostname;
+  const shouldSave = await showToast(account, domain);
   if (shouldSave) {
     await saveAccount(account);
   }
@@ -102,8 +135,10 @@ function observeNewImages() {
           if (!(response as any)?.settings?.autoDetectQR) return;
 
           const accounts = await scanPageForQRAsync(false);
-          for (const account of accounts) {
-            const shouldSave = await showToast(account);
+          const domain = location.hostname;
+          for (const raw of accounts) {
+            const account = enrichAccount(raw);
+            const shouldSave = await showToast(account, domain);
             if (shouldSave) {
               await saveAccount(account);
             }

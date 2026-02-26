@@ -62,11 +62,17 @@ function getToastStyles(): string {
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
+      overflow: hidden;
     }
     .toast-icon svg {
       width: 18px;
       height: 18px;
       fill: white;
+    }
+    .toast-icon img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
     }
     .toast-title {
       font-size: 14px;
@@ -131,34 +137,49 @@ function getToastStyles(): string {
   `;
 }
 
-export function showToast(account: Partial<TwoFactorAccount>): Promise<boolean> {
+export function showToast(account: Partial<TwoFactorAccount>, domain?: string): Promise<boolean> {
   return new Promise((resolve) => {
-    const wrapper = ensureWrapper();;
+    const wrapper = ensureWrapper();
 
     const toast = document.createElement('div');
     toast.className = 'toast';
 
     const issuer = account.issuer || 'Unknown';
     const label = account.label || '';
+    const shieldSvg = '<svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-1 16l-4-4 1.41-1.41L11 14.17l6.59-6.59L19 9l-8 8z"/></svg>';
+    const subtitleText = domain ? `Found on ${domain}` : 'Found on this page';
 
     toast.innerHTML = `
       <div class="toast-header">
         <div class="toast-icon">
-          <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-1 16l-4-4 1.41-1.41L11 14.17l6.59-6.59L19 9l-8 8z"/></svg>
+          ${account.icon ? `<img src="${account.icon}" alt="" />` : shieldSvg}
         </div>
         <div>
           <div class="toast-title">2FA Code Detected</div>
-          <div class="toast-subtitle">Found on this page</div>
+          <div class="toast-subtitle">${subtitleText}</div>
         </div>
       </div>
       <div class="toast-info">
-        <strong>${issuer}</strong>${label ? ` — ${label}` : ''}
+        <strong>${issuer}</strong>${label ? ` &mdash; ${label}` : ''}
       </div>
       <div class="toast-actions">
         <button class="btn btn-dismiss" data-action="dismiss">Dismiss</button>
         <button class="btn btn-save" data-action="save">Save to Vault</button>
       </div>
     `;
+
+    // If favicon image fails to load, fall back to the shield SVG
+    if (account.icon) {
+      const img = toast.querySelector<HTMLImageElement>('.toast-icon img');
+      if (img) {
+        img.onerror = () => {
+          const iconDiv = toast.querySelector('.toast-icon');
+          if (iconDiv) {
+            iconDiv.innerHTML = shieldSvg;
+          }
+        };
+      }
+    }
 
     // Auto-dismiss after 10s
     const autoDismiss = setTimeout(() => {
