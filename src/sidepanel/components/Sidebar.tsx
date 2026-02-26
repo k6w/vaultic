@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import AuthenticatorTab from './authenticator/AuthenticatorTab';
 import MailTab from './mail/MailTab';
+import ImportExportTab from './import-export/ImportExportTab';
 
 type TabId = 'authenticator' | 'mail' | 'import-export' | 'settings';
 
@@ -55,25 +56,6 @@ const tabs: TabConfig[] = [
   },
 ];
 
-function PlaceholderTab({ title }: { title: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center h-full text-center px-8">
-      <svg
-        width="48"
-        height="48"
-        viewBox="0 0 24 24"
-        fill="none"
-        className="text-gray-600 mb-4"
-      >
-        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" />
-        <path d="M8 12h8M12 8v8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      </svg>
-      <p className="text-lg font-medium text-gray-400 mb-1">{title}</p>
-      <p className="text-sm text-gray-500">Coming soon</p>
-    </div>
-  );
-}
-
 export default function Sidebar() {
   const [activeTab, setActiveTab] = useState<TabId>('authenticator');
 
@@ -84,9 +66,9 @@ export default function Sidebar() {
       case 'mail':
         return <MailTab />;
       case 'import-export':
-        return <PlaceholderTab title="Import/Export" />;
+        return <ImportExportTab />;
       case 'settings':
-        return <PlaceholderTab title="Settings" />;
+        return <div className="flex flex-col items-center justify-center h-full text-center px-8"><p className="text-lg font-medium text-gray-400 mb-1">Settings</p><p className="text-sm text-gray-500">Coming soon</p></div>;
     }
   };
 
