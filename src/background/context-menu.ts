@@ -1,10 +1,13 @@
 import browser from 'webextension-polyfill';
 
 export function setupContextMenu(): void {
-  chrome.contextMenus.create({
-    id: 'scanQR',
-    title: 'Scan page for 2FA QR codes',
-    contexts: ['page'],
+  // Remove existing menu items first to avoid duplicates on re-registration
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({
+      id: 'scanQR',
+      title: 'Scan page for 2FA QR codes',
+      contexts: ['page'],
+    });
   });
 }
 

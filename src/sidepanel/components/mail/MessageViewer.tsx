@@ -139,21 +139,21 @@ export default function MessageViewer({ accountId, messageId, onBack }: MessageV
             <div className="flex items-start gap-2">
               <span className="text-xs text-gray-500 w-10 pt-0.5 flex-shrink-0">From</span>
               <div className="text-sm">
-                {message.from.name && (
+                {message.from?.name && (
                   <span className="text-white font-medium">{message.from.name} </span>
                 )}
-                <span className="text-gray-400">&lt;{message.from.address}&gt;</span>
+                <span className="text-gray-400">&lt;{message.from?.address ?? 'unknown'}&gt;</span>
               </div>
             </div>
             <div className="flex items-start gap-2">
               <span className="text-xs text-gray-500 w-10 pt-0.5 flex-shrink-0">To</span>
               <div className="text-sm text-gray-400">
-                {message.to.map((t) => t.address).join(', ')}
+                {(message.to ?? []).map((t) => t.address).join(', ') || 'unknown'}
               </div>
             </div>
             <div className="flex items-start gap-2">
               <span className="text-xs text-gray-500 w-10 pt-0.5 flex-shrink-0">Date</span>
-              <span className="text-sm text-gray-400">{formatFullDate(message.createdAt)}</span>
+              <span className="text-sm text-gray-400">{message.createdAt ? formatFullDate(message.createdAt) : 'Unknown date'}</span>
             </div>
           </div>
 

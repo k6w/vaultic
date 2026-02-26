@@ -27,19 +27,31 @@ export default function CreateMailAccount({ onClose, onCreated }: CreateMailAcco
   const [copiedPassword, setCopiedPassword] = useState(false);
   const [success, setSuccess] = useState<{ address: string; password: string } | null>(null);
 
-  useEffect(() => {
-    async function fetchDomains() {
-      setLoadingDomains(true);
+  const [domainError, setDomainError] = useState<string | null>(null);
+
+  const fetchDomains = useCallback(async () => {
+    setLoadingDomains(true);
+    setDomainError(null);
+    try {
       const result = await getDomains();
       const active = result.filter((d) => d.isActive);
       setDomains(active);
       if (active.length > 0) {
         setSelectedDomain(active[0].domain);
       }
+      if (active.length === 0 && result.length === 0) {
+        setDomainError('Could not load mail domains. The service may be temporarily unavailable.');
+      }
+    } catch {
+      setDomainError('Network error. Please check your connection and try again.');
+    } finally {
       setLoadingDomains(false);
     }
-    fetchDomains();
   }, [getDomains]);
+
+  useEffect(() => {
+    fetchDomains();
+  }, [fetchDomains]);
 
   const password = autoGenerate ? generatedPassword : customPassword;
   const fullAddress = username && selectedDomain ? `${username}@${selectedDomain}` : '';
@@ -74,9 +86,13 @@ export default function CreateMailAccount({ onClose, onCreated }: CreateMailAcco
     if (!isValid || loading) return;
     setError(null);
 
-    const account = await createAccount(fullAddress, password);
-    if (account) {
-      setSuccess({ address: account.address, password });
+    try {
+      const account = await createAccount(fullAddress, password);
+      if (account) {
+        setSuccess({ address: account.address, password });
+      }
+    } catch {
+      setError('Failed to create account. Please try a different username or try again later.');
     }
   };
 
@@ -171,8 +187,17 @@ export default function CreateMailAccount({ onClose, onCreated }: CreateMailAcco
               </div>
             ) : domains.length === 0 ? (
               <div className="text-center py-6">
-                <p className="text-sm text-gray-400">No domains available at the moment.</p>
+                <p className="text-sm text-gray-400">
+                  {domainError ?? 'No domains available at the moment.'}
+                </p>
                 <p className="text-xs text-gray-500 mt-1">Please try again later.</p>
+                <button
+                  type="button"
+                  onClick={fetchDomains}
+                  className="mt-3 px-3 py-1.5 text-xs text-emerald-400 hover:text-emerald-300 bg-emerald-900/20 hover:bg-emerald-900/30 border border-emerald-800/30 rounded-lg transition-colors duration-150"
+                >
+                  Retry
+                </button>
               </div>
             ) : (
               <>

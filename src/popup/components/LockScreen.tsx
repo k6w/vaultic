@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { sendMessage } from '@shared/messages';
 
 interface LockScreenProps {
@@ -13,9 +13,31 @@ export default function LockScreen({ mode, onUnlocked }: LockScreenProps) {
   const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
+  const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Cooldown countdown timer
+  useEffect(() => {
+    if (cooldownSeconds > 0) {
+      cooldownRef.current = setInterval(() => {
+        setCooldownSeconds((prev) => {
+          if (prev <= 1) {
+            if (cooldownRef.current) clearInterval(cooldownRef.current);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+
+    return () => {
+      if (cooldownRef.current) clearInterval(cooldownRef.current);
+    };
+  }, [cooldownSeconds > 0]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (cooldownSeconds > 0) return;
     setError(null);
     setLoading(true);
 
@@ -63,11 +85,17 @@ export default function LockScreen({ mode, onUnlocked }: LockScreenProps) {
         if (result.success) {
           onUnlocked();
         } else {
+          // Parse cooldown from error message (e.g. "Too many attempts. Try again in 28 seconds.")
+          const cooldownMatch = result.error?.match(/Try again in (\d+) seconds/);
+          if (cooldownMatch) {
+            setCooldownSeconds(parseInt(cooldownMatch[1], 10));
+          }
           setError(result.error ?? 'Wrong password');
         }
       }
     } catch (err) {
-      setError((err as Error).message);
+      const message = err instanceof Error ? err.message : 'Connection error. Please try again.';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -177,20 +205,39 @@ export default function LockScreen({ mode, onUnlocked }: LockScreenProps) {
 
         {/* Error message */}
         {error && (
-          <p className="text-red-400 text-xs text-center">{error}</p>
+          <div className="bg-red-900/20 border border-red-800/50 rounded-lg px-3 py-2">
+            <p className="text-red-400 text-xs text-center">{error}</p>
+          </div>
+        )}
+
+        {/* Cooldown timer */}
+        {cooldownSeconds > 0 && (
+          <div className="bg-amber-900/20 border border-amber-800/50 rounded-lg px-3 py-2">
+            <p className="text-amber-400 text-xs text-center">
+              Try again in {cooldownSeconds}s
+            </p>
+            <div className="mt-1.5 h-1 bg-gray-800 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-amber-500/60 rounded-full transition-all duration-1000 ease-linear"
+                style={{ width: `${(cooldownSeconds / 30) * 100}%` }}
+              />
+            </div>
+          </div>
         )}
 
         {/* Submit button */}
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || cooldownSeconds > 0}
           className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-600/50 disabled:cursor-not-allowed text-white font-medium rounded-lg px-4 py-2.5 text-sm transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
         >
           {loading
             ? 'Please wait...'
-            : mode === 'create'
-              ? 'Create Vault'
-              : 'Unlock'}
+            : cooldownSeconds > 0
+              ? `Locked (${cooldownSeconds}s)`
+              : mode === 'create'
+                ? 'Create Vault'
+                : 'Unlock'}
         </button>
       </form>
     </div>

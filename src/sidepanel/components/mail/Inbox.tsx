@@ -110,7 +110,16 @@ export default function Inbox({ accountId, account, onSelectMessage }: InboxProp
       <div className="flex-1 overflow-y-auto">
         {error && (
           <div className="mx-4 mt-3 bg-red-900/20 border border-red-800/50 rounded-lg px-3 py-2">
-            <p className="text-sm text-red-400">{error}</p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm text-red-400 flex-1">{error}</p>
+              <button
+                onClick={handleRefresh}
+                disabled={loading}
+                className="flex-shrink-0 px-2.5 py-1 text-xs text-red-300 hover:text-white bg-red-900/30 hover:bg-red-800/40 rounded transition-colors duration-150 disabled:opacity-50"
+              >
+                Retry
+              </button>
+            </div>
           </div>
         )}
 
@@ -165,7 +174,7 @@ export default function Inbox({ accountId, account, onSelectMessage }: InboxProp
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2 mb-0.5">
                       <p className={`text-sm truncate ${!msg.seen ? 'font-semibold text-white' : 'text-gray-300'}`}>
-                        {msg.from.name || msg.from.address}
+                        {msg.from?.name || msg.from?.address || 'Unknown sender'}
                       </p>
                       <span className="flex-shrink-0 text-xs text-gray-500">
                         {formatRelativeTime(msg.createdAt)}

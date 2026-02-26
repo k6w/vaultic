@@ -5,11 +5,26 @@ import { setupTotpAlarm, handleTotpAlarm } from './totp-alarm';
 import { handleAutoLock } from './lock-manager';
 import type { BackgroundMessage } from '@shared/types';
 
-// Extension installed
-chrome.runtime.onInstalled.addListener(() => {
+/**
+ * Initialization function shared between onInstalled and onStartup.
+ * Re-registers context menus and alarms which may be lost on SW restart.
+ */
+function initialize() {
   setupContextMenu();
   setupTotpAlarm();
-  console.log('2FA Manager extension installed');
+}
+
+// Extension installed or updated
+chrome.runtime.onInstalled.addListener((details) => {
+  initialize();
+  console.log(`2FA Manager extension ${details.reason} (v${chrome.runtime.getManifest().version})`);
+});
+
+// Browser startup - re-register context menus and alarms
+// This handles the case where Chrome restarts and the service worker needs to re-initialize
+chrome.runtime.onStartup.addListener(() => {
+  initialize();
+  console.log('2FA Manager: browser startup, re-initialized context menu and alarms');
 });
 
 // Message handling
