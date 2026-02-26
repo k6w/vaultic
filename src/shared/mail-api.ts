@@ -1,0 +1,151 @@
+import { MAIL_API_BASE } from './constants';
+import type { MailDomain, MailMessage, MailMessageDetail } from './types';
+
+async function request<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  const url = `${MAIL_API_BASE}${path}`;
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Authentication failed. Please re-authenticate.');
+    }
+    if (response.status === 429) {
+      throw new Error('Rate limited. Please try again later.');
+    }
+    const text = await response.text().catch(() => '');
+    throw new Error(
+      `Mail API error ${response.status}: ${response.statusText}${text ? ` - ${text}` : ''}`,
+    );
+  }
+
+  // DELETE responses may have no body
+  if (response.status === 204 || response.headers.get('content-length') === '0') {
+    return undefined as T;
+  }
+
+  return response.json() as Promise<T>;
+}
+
+function authHeaders(token: string): Record<string, string> {
+  return { Authorization: `Bearer ${token}` };
+}
+
+interface HydraCollection<T> {
+  'hydra:member': T[];
+  'hydra:totalItems': number;
+}
+
+interface DomainResponse {
+  id: string;
+  domain: string;
+  isActive: boolean;
+}
+
+interface AccountResponse {
+  id: string;
+  address: string;
+}
+
+interface TokenResponse {
+  token: string;
+}
+
+interface MeResponse {
+  id: string;
+  address: string;
+  quota: number;
+  used: number;
+}
+
+export class MailTmClient {
+  static async getDomains(): Promise<MailDomain[]> {
+    const data = await request<HydraCollection<DomainResponse>>('/domains');
+    return data['hydra:member'].map((d) => ({
+      id: d.id,
+      domain: d.domain,
+      isActive: d.isActive,
+    }));
+  }
+
+  static async createAccount(
+    address: string,
+    password: string,
+  ): Promise<{ id: string; address: string }> {
+    const data = await request<AccountResponse>('/accounts', {
+      method: 'POST',
+      body: JSON.stringify({ address, password }),
+    });
+    return { id: data.id, address: data.address };
+  }
+
+  static async getToken(
+    address: string,
+    password: string,
+  ): Promise<string> {
+    const data = await request<TokenResponse>('/token', {
+      method: 'POST',
+      body: JSON.stringify({ address, password }),
+    });
+    return data.token;
+  }
+
+  static async getMessages(
+    token: string,
+    page: number = 1,
+  ): Promise<{ messages: MailMessage[]; total: number }> {
+    const data = await request<HydraCollection<MailMessage>>(
+      `/messages?page=${page}`,
+      { headers: authHeaders(token) },
+    );
+    return {
+      messages: data['hydra:member'],
+      total: data['hydra:totalItems'],
+    };
+  }
+
+  static async getMessage(
+    token: string,
+    messageId: string,
+  ): Promise<MailMessageDetail> {
+    return request<MailMessageDetail>(`/messages/${messageId}`, {
+      headers: authHeaders(token),
+    });
+  }
+
+  static async deleteMessage(
+    token: string,
+    messageId: string,
+  ): Promise<void> {
+    await request<void>(`/messages/${messageId}`, {
+      method: 'DELETE',
+      headers: authHeaders(token),
+    });
+  }
+
+  static async deleteAccount(
+    token: string,
+    accountId: string,
+  ): Promise<void> {
+    await request<void>(`/accounts/${accountId}`, {
+      method: 'DELETE',
+      headers: authHeaders(token),
+    });
+  }
+
+  static async getMe(
+    token: string,
+  ): Promise<{ id: string; address: string; quota: number; used: number }> {
+    return request<MeResponse>('/me', {
+      headers: authHeaders(token),
+    });
+  }
+}
