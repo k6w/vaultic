@@ -2,6 +2,7 @@ import { useState } from 'react';
 import AuthenticatorTab from './authenticator/AuthenticatorTab';
 import MailTab from './mail/MailTab';
 import ImportExportTab from './import-export/ImportExportTab';
+import SettingsTab from './settings/SettingsTab';
 
 type TabId = 'authenticator' | 'mail' | 'import-export' | 'settings';
 
@@ -68,7 +69,7 @@ export default function Sidebar() {
       case 'import-export':
         return <ImportExportTab />;
       case 'settings':
-        return <div className="flex flex-col items-center justify-center h-full text-center px-8"><p className="text-lg font-medium text-gray-400 mb-1">Settings</p><p className="text-sm text-gray-500">Coming soon</p></div>;
+        return <SettingsTab />;
     }
   };
 
