@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import AuthenticatorTab from './authenticator/AuthenticatorTab';
+import MailTab from './mail/MailTab';
 
 type TabId = 'authenticator' | 'mail' | 'import-export' | 'settings';
 
@@ -81,7 +82,7 @@ export default function Sidebar() {
       case 'authenticator':
         return <AuthenticatorTab />;
       case 'mail':
-        return <PlaceholderTab title="Mail" />;
+        return <MailTab />;
       case 'import-export':
         return <PlaceholderTab title="Import/Export" />;
       case 'settings':
