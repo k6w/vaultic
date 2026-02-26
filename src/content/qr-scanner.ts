@@ -168,6 +168,30 @@ function scanSVGDataUri(
   return null;
 }
 
+/**
+ * Scan a single image by its URL. Used for right-click "Scan image as QR code".
+ */
+export async function scanSingleImageUrl(srcUrl: string): Promise<Partial<TwoFactorAccount> | null> {
+  try {
+    const response = await fetch(srcUrl);
+    const blob = await response.blob();
+    const bitmap = await createImageBitmap(blob);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    ctx.drawImage(bitmap, 0, 0);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    return decodeQR(imageData);
+  } catch {
+    return null;
+  }
+}
+
 function decodeQR(imageData: ImageData): Partial<TwoFactorAccount> | null {
   const code = jsQR(imageData.data, imageData.width, imageData.height);
   if (!code) return null;

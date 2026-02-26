@@ -1,12 +1,14 @@
 import browser from 'webextension-polyfill';
-import { scanPageForQRAsync } from './qr-scanner';
+import { scanPageForQRAsync, scanSingleImageUrl } from './qr-scanner';
 import { showToast, showNoQRToast } from './toast';
 import type { TwoFactorAccount } from '../shared/types';
 
-// Listen for messages from background (manual scan trigger)
+// Listen for messages from background (manual scan / image scan trigger)
 browser.runtime.onMessage.addListener((message: any) => {
   if (message.type === 'SCAN_PAGE_QR') {
     handleManualScan();
+  } else if (message.type === 'SCAN_IMAGE_QR' && message.srcUrl) {
+    handleSingleImageScan(message.srcUrl);
   }
 });
 
@@ -46,6 +48,20 @@ async function handleManualScan() {
     if (shouldSave) {
       await saveAccount(account);
     }
+  }
+}
+
+async function handleSingleImageScan(srcUrl: string) {
+  const account = await scanSingleImageUrl(srcUrl);
+
+  if (!account) {
+    showNoQRToast();
+    return;
+  }
+
+  const shouldSave = await showToast(account);
+  if (shouldSave) {
+    await saveAccount(account);
   }
 }
 

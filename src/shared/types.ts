@@ -113,4 +113,5 @@ export type BackgroundMessage =
 // Content script messages
 export type ContentMessage =
   | { type: 'SCAN_PAGE_QR' }
+  | { type: 'SCAN_IMAGE_QR'; srcUrl: string }
   | { type: 'QR_SCAN_RESULT'; accounts: Partial<TwoFactorAccount>[] };
