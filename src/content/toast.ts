@@ -1,25 +1,26 @@
 import type { TwoFactorAccount } from '../shared/types';
 
-let toastContainer: HTMLElement | null = null;
+let shadowRoot: ShadowRoot | null = null;
+let toastWrapper: HTMLElement | null = null;
 
-function ensureContainer(): HTMLElement {
-  if (toastContainer) return toastContainer;
+function ensureWrapper(): HTMLElement {
+  if (toastWrapper && shadowRoot) return toastWrapper;
 
-  toastContainer = document.createElement('div');
-  toastContainer.id = '2fa-manager-toast-container';
-  const shadow = toastContainer.attachShadow({ mode: 'closed' });
+  const container = document.createElement('div');
+  container.id = '2fa-manager-toast-container';
+  shadowRoot = container.attachShadow({ mode: 'closed' });
 
   // Inject styles into shadow DOM
   const style = document.createElement('style');
   style.textContent = getToastStyles();
-  shadow.appendChild(style);
+  shadowRoot.appendChild(style);
 
-  const wrapper = document.createElement('div');
-  wrapper.id = 'toast-wrapper';
-  shadow.appendChild(wrapper);
+  toastWrapper = document.createElement('div');
+  toastWrapper.id = 'toast-wrapper';
+  shadowRoot.appendChild(toastWrapper);
 
-  document.body.appendChild(toastContainer);
-  return toastContainer;
+  document.body.appendChild(container);
+  return toastWrapper;
 }
 
 function getToastStyles(): string {
@@ -132,8 +133,7 @@ function getToastStyles(): string {
 
 export function showToast(account: Partial<TwoFactorAccount>): Promise<boolean> {
   return new Promise((resolve) => {
-    const container = ensureContainer();
-    const wrapper = container.shadowRoot!.getElementById('toast-wrapper')!;
+    const wrapper = ensureWrapper();;
 
     const toast = document.createElement('div');
     toast.className = 'toast';
@@ -185,8 +185,7 @@ export function showToast(account: Partial<TwoFactorAccount>): Promise<boolean> 
 }
 
 export function showNoQRToast(): void {
-  const container = ensureContainer();
-  const wrapper = container.shadowRoot!.getElementById('toast-wrapper')!;
+  const wrapper = ensureWrapper();;
 
   const toast = document.createElement('div');
   toast.className = 'toast';
