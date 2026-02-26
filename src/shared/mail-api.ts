@@ -21,10 +21,39 @@ async function request<T>(
     if (response.status === 429) {
       throw new Error('Rate limited. Please try again later.');
     }
+
+    // Parse structured error responses (mail.tm returns hydra violations)
     const text = await response.text().catch(() => '');
-    throw new Error(
-      `Mail API error ${response.status}: ${response.statusText}${text ? ` - ${text}` : ''}`,
-    );
+    let friendlyMessage = '';
+
+    if (text) {
+      try {
+        const errorBody = JSON.parse(text);
+        // Handle 422 validation errors with violations array
+        if (errorBody.violations && Array.isArray(errorBody.violations)) {
+          friendlyMessage = errorBody.violations
+            .map((v: { propertyPath?: string; message?: string }) => {
+              const field = v.propertyPath ? `${v.propertyPath}: ` : '';
+              return `${field}${v.message || 'Validation error'}`;
+            })
+            .join('. ');
+        } else if (errorBody['hydra:description']) {
+          friendlyMessage = errorBody['hydra:description'];
+        } else if (errorBody.detail) {
+          friendlyMessage = errorBody.detail;
+        }
+      } catch {
+        // Not JSON, use raw text
+      }
+    }
+
+    if (!friendlyMessage) {
+      friendlyMessage = response.status === 422
+        ? 'Validation error. Please check your input.'
+        : `Request failed (${response.status})`;
+    }
+
+    throw new Error(friendlyMessage);
   }
 
   // DELETE responses may have no body

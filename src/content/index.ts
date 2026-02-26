@@ -1,5 +1,5 @@
 import browser from 'webextension-polyfill';
-import { scanPageForQR } from './qr-scanner';
+import { scanPageForQRAsync } from './qr-scanner';
 import { showToast, showNoQRToast } from './toast';
 import type { TwoFactorAccount } from '../shared/types';
 
@@ -17,10 +17,10 @@ async function autoDetect() {
     const response = await browser.runtime.sendMessage({ type: 'GET_SETTINGS' });
     if (!(response as any)?.settings?.autoDetectQR) return;
 
-    // Wait for page to settle
-    await new Promise(r => setTimeout(r, 2000));
+    // Wait for page to settle and images to load
+    await new Promise(r => setTimeout(r, 3000));
 
-    const accounts = scanPageForQR();
+    const accounts = await scanPageForQRAsync(false);
     for (const account of accounts) {
       const shouldSave = await showToast(account);
       if (shouldSave) {
@@ -33,7 +33,8 @@ async function autoDetect() {
 }
 
 async function handleManualScan() {
-  const accounts = scanPageForQR();
+  // Manual scan always re-scans everything (manual=true bypasses cache)
+  const accounts = await scanPageForQRAsync(true);
 
   if (accounts.length === 0) {
     showNoQRToast();
@@ -68,7 +69,8 @@ function observeNewImages() {
     for (const mutation of mutations) {
       for (const node of mutation.addedNodes) {
         if (node instanceof HTMLImageElement ||
-            (node instanceof HTMLElement && node.querySelector('img, canvas'))) {
+            node instanceof SVGElement ||
+            (node instanceof HTMLElement && node.querySelector('img, canvas, svg'))) {
           hasNewImages = true;
           break;
         }
@@ -83,7 +85,7 @@ function observeNewImages() {
           const response = await browser.runtime.sendMessage({ type: 'GET_SETTINGS' });
           if (!(response as any)?.settings?.autoDetectQR) return;
 
-          const accounts = scanPageForQR();
+          const accounts = await scanPageForQRAsync(false);
           for (const account of accounts) {
             const shouldSave = await showToast(account);
             if (shouldSave) {

@@ -16,10 +16,18 @@ interface ImportCandidate {
   resolution: ConflictResolution;
 }
 
+interface MailAccountExport {
+  address: string;
+  password: string;
+  label?: string;
+  createdAt: number;
+}
+
 interface ExportData {
   version: 1;
   exportedAt: string;
   accounts: TwoFactorAccount[];
+  mailAccounts?: MailAccountExport[];
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -226,18 +234,29 @@ export default function ImportExportTab() {
     try {
       const response = await sendMessage<{ vault?: VaultData }>({ type: 'EXPORT_VAULT' });
       const accounts = response.vault?.accounts ?? [];
-      if (accounts.length === 0) {
+      const mailAccounts = response.vault?.mailAccounts ?? [];
+      if (accounts.length === 0 && mailAccounts.length === 0) {
         setError('No accounts to export');
         return;
       }
+      const mailExport: MailAccountExport[] = mailAccounts.map((m) => ({
+        address: m.address,
+        password: m.password,
+        label: m.label,
+        createdAt: m.createdAt,
+      }));
       const exportData: ExportData = {
         version: 1,
         exportedAt: new Date().toISOString(),
         accounts,
+        ...(mailExport.length > 0 ? { mailAccounts: mailExport } : {}),
       };
       const json = JSON.stringify(exportData, null, 2);
       downloadFile(json, `2fa-manager-backup-${todayString()}.json`, 'application/json');
-      setSuccessMessage(`Exported ${accounts.length} accounts`);
+      const parts: string[] = [];
+      if (accounts.length > 0) parts.push(`${accounts.length} 2FA accounts`);
+      if (mailExport.length > 0) parts.push(`${mailExport.length} mail accounts`);
+      setSuccessMessage(`Exported ${parts.join(' and ')}`);
     } catch (err) {
       setError((err as Error).message);
     }
@@ -584,7 +603,7 @@ export default function ImportExportTab() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-white">JSON Export</p>
-                  <p className="text-xs text-gray-400 mt-0.5">Export all 2FA accounts as JSON</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Export 2FA accounts and mail credentials as JSON</p>
                 </div>
                 <button
                   onClick={handleJsonExport}
