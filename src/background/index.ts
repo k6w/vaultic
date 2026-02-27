@@ -17,14 +17,14 @@ function initialize() {
 // Extension installed or updated
 chrome.runtime.onInstalled.addListener((details) => {
   initialize();
-  console.log(`2FA Manager extension ${details.reason} (v${chrome.runtime.getManifest().version})`);
+  console.log(`Vaultic extension ${details.reason} (v${chrome.runtime.getManifest().version})`);
 });
 
 // Browser startup - re-register context menus and alarms
 // This handles the case where Chrome restarts and the service worker needs to re-initialize
 chrome.runtime.onStartup.addListener(() => {
   initialize();
-  console.log('2FA Manager: browser startup, re-initialized context menu and alarms');
+  console.log('Vaultic: browser startup, re-initialized context menu and alarms');
 });
 
 // Message handling
@@ -46,4 +46,4 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 // Context menu handling
 chrome.contextMenus.onClicked.addListener(handleContextMenuClick);
 
-console.log('2FA Manager background service worker loaded');
+console.log('Vaultic background service worker loaded');

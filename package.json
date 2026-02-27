@@ -1,7 +1,7 @@
 {
-  "name": "2fa-manager",
+  "name": "vaultic",
   "version": "1.0.0",
-  "description": "",
+  "description": "TOTP 2FA authenticator with temporary email — encrypted, cross-browser",
   "main": "index.js",
   "directories": {
     "doc": "docs"

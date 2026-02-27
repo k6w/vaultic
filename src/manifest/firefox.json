@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "2FA Manager + Temp Mail",
+  "name": "Vaultic",
   "version": "1.0.0",
-  "description": "TOTP 2FA manager with temporary email integration",
+  "description": "TOTP 2FA authenticator with temporary email — encrypted, cross-browser",
   "permissions": [
     "storage",
     "alarms",
@@ -22,7 +22,7 @@
   },
   "sidebar_action": {
     "default_panel": "sidepanel/index.html",
-    "default_title": "2FA Manager + Temp Mail"
+    "default_title": "Vaultic"
   },
   "background": {
     "scripts": ["background/index.js"]
@@ -41,7 +41,7 @@
   },
   "browser_specific_settings": {
     "gecko": {
-      "id": "2fa-manager@extension"
+      "id": "vaultic@extension"
     }
   }
 }

@@ -134,7 +134,7 @@ export default function LockScreen({ mode, onUnlocked }: LockScreenProps) {
         </svg>
       </div>
 
-      <h1 className="text-xl font-semibold text-white mb-1">2FA Manager</h1>
+      <h1 className="text-xl font-semibold text-white mb-1">Vaultic</h1>
       <p className="text-sm text-gray-400 mb-8">
         {mode === 'create' ? 'Create Master Password' : 'Enter Master Password'}
       </p>

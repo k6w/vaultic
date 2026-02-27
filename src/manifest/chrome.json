@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "2FA Manager + Temp Mail",
+  "name": "Vaultic",
   "version": "1.0.0",
-  "description": "TOTP 2FA manager with temporary email integration",
+  "description": "TOTP 2FA authenticator with temporary email — encrypted, cross-browser",
   "permissions": [
     "storage",
     "alarms",
