@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import CountdownRing from './CountdownRing';
 import type { TwoFactorAccount } from '@shared/types';
+import { getFaviconUrl } from '@shared/favicon';
 
 interface TOTPCardProps {
   account: TwoFactorAccount;
@@ -42,6 +43,8 @@ export default function TOTPCard({
   period,
 }: TOTPCardProps) {
   const [copied, setCopied] = useState(false);
+  const [faviconError, setFaviconError] = useState(false);
+  const faviconUrl = getFaviconUrl(account.issuer, account.icon);
 
   const copyToClipboard = useCallback(async () => {
     try {
@@ -66,13 +69,22 @@ export default function TOTPCard({
       className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer hover:bg-gray-800/50 transition-colors duration-150 group"
     >
       {/* Issuer icon */}
-      <div
-        className={`flex-shrink-0 w-9 h-9 rounded-full ${getIssuerColor(account.issuer)} flex items-center justify-center`}
-      >
-        <span className="text-white text-sm font-semibold">
-          {account.issuer.charAt(0).toUpperCase()}
-        </span>
-      </div>
+      {faviconUrl && !faviconError ? (
+        <img
+          src={faviconUrl}
+          alt={account.issuer}
+          className="flex-shrink-0 w-9 h-9 rounded-full"
+          onError={() => setFaviconError(true)}
+        />
+      ) : (
+        <div
+          className={`flex-shrink-0 w-9 h-9 rounded-full ${getIssuerColor(account.issuer)} flex items-center justify-center`}
+        >
+          <span className="text-white text-sm font-semibold">
+            {account.issuer.charAt(0).toUpperCase()}
+          </span>
+        </div>
+      )}
 
       {/* Account info */}
       <div className="flex-1 min-w-0">

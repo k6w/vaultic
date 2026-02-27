@@ -4,6 +4,7 @@ import { useTotp } from '@hooks/useTotp';
 import { useCountdown } from '@hooks/useCountdown';
 import { sendMessage } from '@shared/messages';
 import type { TwoFactorAccount } from '@shared/types';
+import { getFaviconUrl } from '@shared/favicon';
 import SearchBar from '../../../popup/components/SearchBar';
 import CountdownRing from '../../../popup/components/CountdownRing';
 import AccountForm from './AccountForm';
@@ -32,6 +33,32 @@ function getIssuerColor(issuer: string): string {
 function formatCode(code: string): string {
   const mid = Math.floor(code.length / 2);
   return code.slice(0, mid) + ' ' + code.slice(mid);
+}
+
+function AccountIcon({ account }: { account: TwoFactorAccount }) {
+  const [faviconError, setFaviconError] = useState(false);
+  const faviconUrl = getFaviconUrl(account.issuer, account.icon);
+
+  if (faviconUrl && !faviconError) {
+    return (
+      <img
+        src={faviconUrl}
+        alt={account.issuer}
+        className="flex-shrink-0 w-10 h-10 rounded-full"
+        onError={() => setFaviconError(true)}
+      />
+    );
+  }
+
+  return (
+    <div
+      className={`flex-shrink-0 w-10 h-10 rounded-full ${getIssuerColor(account.issuer)} flex items-center justify-center`}
+    >
+      <span className="text-white text-sm font-semibold">
+        {account.issuer.charAt(0).toUpperCase()}
+      </span>
+    </div>
+  );
 }
 
 export default function AuthenticatorTab() {
@@ -151,13 +178,7 @@ export default function AuthenticatorTab() {
                   className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-gray-800/50 transition-colors duration-150 group"
                 >
                   {/* Issuer icon */}
-                  <div
-                    className={`flex-shrink-0 w-10 h-10 rounded-full ${getIssuerColor(account.issuer)} flex items-center justify-center`}
-                  >
-                    <span className="text-white text-sm font-semibold">
-                      {account.issuer.charAt(0).toUpperCase()}
-                    </span>
-                  </div>
+                  <AccountIcon account={account} />
 
                   {/* Account info */}
                   <div className="flex-1 min-w-0">

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { MailAccount } from '@shared/types';
+import { getFaviconUrl } from '@shared/favicon';
 
 interface MailAccountListProps {
   accounts: MailAccount[];
@@ -29,6 +30,32 @@ function getAccountColor(address: string): string {
   return accountColors[Math.abs(hash) % accountColors.length];
 }
 
+function MailAccountIcon({ account }: { account: MailAccount }) {
+  const [faviconError, setFaviconError] = useState(false);
+  const domain = account.address.split('@')[1];
+  const faviconUrl = domain ? getFaviconUrl(domain) : null;
+  const localPart = account.address.split('@')[0];
+
+  if (faviconUrl && !faviconError) {
+    return (
+      <img
+        src={faviconUrl}
+        alt={domain}
+        className="flex-shrink-0 w-8 h-8 rounded-full"
+        onError={() => setFaviconError(true)}
+      />
+    );
+  }
+
+  return (
+    <div className={`flex-shrink-0 w-8 h-8 rounded-full ${getAccountColor(account.address)} flex items-center justify-center`}>
+      <span className="text-white text-xs font-semibold uppercase">
+        {localPart.charAt(0)}
+      </span>
+    </div>
+  );
+}
+
 export default function MailAccountList({ accounts, selectedId, onSelect, onDelete }: MailAccountListProps) {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
@@ -53,7 +80,6 @@ export default function MailAccountList({ accounts, selectedId, onSelect, onDele
       {accounts.map((account) => {
         const isSelected = selectedId === account.id;
         const isConfirming = confirmDeleteId === account.id;
-        const localPart = account.address.split('@')[0];
 
         return (
           <button
@@ -69,11 +95,7 @@ export default function MailAccountList({ accounts, selectedId, onSelect, onDele
             `}
           >
             {/* Avatar */}
-            <div className={`flex-shrink-0 w-8 h-8 rounded-full ${getAccountColor(account.address)} flex items-center justify-center`}>
-              <span className="text-white text-xs font-semibold uppercase">
-                {localPart.charAt(0)}
-              </span>
-            </div>
+            <MailAccountIcon account={account} />
 
             {/* Info */}
             <div className="flex-1 min-w-0">
