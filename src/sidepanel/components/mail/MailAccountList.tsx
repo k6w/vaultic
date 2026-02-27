@@ -10,16 +10,9 @@ interface MailAccountListProps {
 }
 
 const accountColors = [
-  'bg-blue-500',
-  'bg-purple-500',
-  'bg-pink-500',
-  'bg-amber-500',
-  'bg-emerald-500',
-  'bg-teal-500',
-  'bg-cyan-500',
-  'bg-indigo-500',
-  'bg-rose-500',
-  'bg-orange-500',
+  'bg-blue-500', 'bg-purple-500', 'bg-pink-500', 'bg-amber-500',
+  'bg-emerald-500', 'bg-teal-500', 'bg-cyan-500', 'bg-indigo-500',
+  'bg-rose-500', 'bg-orange-500',
 ];
 
 function getAccountColor(address: string): string {
@@ -40,16 +33,16 @@ function MailAccountIcon({ account }: { account: MailAccount }) {
     return (
       <img
         src={faviconUrl}
-        alt={domain}
-        className="flex-shrink-0 w-8 h-8 rounded-full"
+        alt=""
+        className="flex-shrink-0 w-9 h-9 rounded-lg bg-gray-800"
         onError={() => setFaviconError(true)}
       />
     );
   }
 
   return (
-    <div className={`flex-shrink-0 w-8 h-8 rounded-full ${getAccountColor(account.address)} flex items-center justify-center`}>
-      <span className="text-white text-xs font-semibold uppercase">
+    <div className={`flex-shrink-0 w-9 h-9 rounded-lg ${getAccountColor(account.address)} flex items-center justify-center`}>
+      <span className="text-white text-xs font-bold uppercase">
         {localPart.charAt(0)}
       </span>
     </div>
@@ -86,31 +79,30 @@ export default function MailAccountList({ accounts, selectedId, onSelect, onDele
             key={account.id}
             onClick={() => onSelect(account.id)}
             className={`
-              relative w-full text-left px-3 py-2.5 flex items-center gap-2.5
-              transition-colors duration-150 group
+              w-full text-left px-4 py-3 flex items-center gap-3
+              transition-colors duration-150 group border-b border-gray-800/40
               ${isSelected
-                ? 'bg-gray-800 border-l-2 border-emerald-500'
-                : 'border-l-2 border-transparent hover:bg-gray-800/50'
+                ? 'bg-gray-800/70'
+                : 'hover:bg-gray-800/40 active:bg-gray-800/60'
               }
             `}
           >
-            {/* Avatar */}
             <MailAccountIcon account={account} />
 
             {/* Info */}
             <div className="flex-1 min-w-0">
               {account.label && (
-                <p className="text-xs text-emerald-400 font-medium truncate">{account.label}</p>
+                <p className="text-xs text-emerald-400 font-medium truncate leading-tight">{account.label}</p>
               )}
-              <p className="text-sm text-gray-300 truncate">{account.address}</p>
+              <p className="text-sm text-gray-300 truncate leading-tight">{account.address}</p>
             </div>
 
-            {/* Delete */}
+            {/* Arrow / Delete */}
             {isConfirming ? (
               <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                 <button
                   onClick={(e) => handleConfirmDelete(e, account.id)}
-                  className="p-1 rounded text-red-400 hover:text-red-300 hover:bg-red-900/30 transition-colors duration-150"
+                  className="p-1.5 rounded-md text-red-400 hover:text-red-300 hover:bg-red-900/30 transition-colors duration-150"
                   title="Confirm delete"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -119,7 +111,7 @@ export default function MailAccountList({ accounts, selectedId, onSelect, onDele
                 </button>
                 <button
                   onClick={handleCancelDelete}
-                  className="p-1 rounded text-gray-400 hover:text-gray-300 hover:bg-gray-700 transition-colors duration-150"
+                  className="p-1.5 rounded-md text-gray-400 hover:text-gray-300 hover:bg-gray-700 transition-colors duration-150"
                   title="Cancel"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -129,16 +121,21 @@ export default function MailAccountList({ accounts, selectedId, onSelect, onDele
                 </button>
               </div>
             ) : (
-              <button
-                onClick={(e) => handleDeleteClick(e, account.id)}
-                className="flex-shrink-0 p-1 rounded text-gray-500 hover:text-red-400 hover:bg-gray-700 opacity-0 group-hover:opacity-100 transition-all duration-150"
-                title="Delete account"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="3 6 5 6 21 6" />
-                  <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <button
+                  onClick={(e) => handleDeleteClick(e, account.id)}
+                  className="p-1.5 rounded-md text-gray-600 hover:text-red-400 hover:bg-gray-700/50 opacity-0 group-hover:opacity-100 transition-all duration-150"
+                  title="Delete account"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+                  </svg>
+                </button>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-gray-600">
+                  <polyline points="9 18 15 12 9 6" />
                 </svg>
-              </button>
+              </div>
             )}
           </button>
         );
