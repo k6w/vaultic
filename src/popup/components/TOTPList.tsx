@@ -1,7 +1,25 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
+import { PanelRight, ShieldCheck, Command as CommandIcon, Copy, Wand2, Lock } from 'lucide-react';
 import { useVault } from '@hooks/useVault';
 import { useTotp } from '@hooks/useTotp';
 import { useCountdown } from '@hooks/useCountdown';
+import { useTheme } from '@hooks/useTheme';
+import { sendMessage } from '@shared/messages';
+import { sortAccounts, matchesQuery } from '@shared/accounts';
+import { requestAutofill } from '@shared/autofill-client';
+import { copyWithClear } from '@shared/clipboard';
+import type { TwoFactorAccount } from '@shared/types';
+import {
+  Logo,
+  ThemeToggle,
+  IconButton,
+  Button,
+  Spinner,
+  EmptyState,
+  CommandPalette,
+  useCommandPaletteHotkey,
+  type Command,
+} from '@shared/ui';
 import SearchBar from './SearchBar';
 import TOTPCard from './TOTPCard';
 
@@ -10,87 +28,149 @@ export default function TOTPList() {
   const accounts = vault?.accounts ?? [];
   const codes = useTotp(accounts);
   const remainingSeconds = useCountdown(30);
+  const { setTheme, theme } = useTheme();
   const [search, setSearch] = useState('');
+  const [toast, setToast] = useState<string | null>(null);
+  const [paletteOpen, setPaletteOpen] = useCommandPaletteHotkey();
+  const clearSeconds = vault?.settings?.clipboardClearSeconds ?? 0;
 
-  const filteredAccounts = useMemo(() => {
-    if (!search.trim()) return accounts;
-    const query = search.toLowerCase();
-    return accounts.filter(
-      (a) =>
-        a.issuer.toLowerCase().includes(query) ||
-        a.label.toLowerCase().includes(query),
-    );
-  }, [accounts, search]);
+  const visible = useMemo(
+    () => sortAccounts(accounts.filter((a) => matchesQuery(a, search))),
+    [accounts, search]
+  );
 
-  const handleOpenManager = async () => {
+  const flash = useCallback((msg: string) => {
+    setToast(msg);
+    window.setTimeout(() => setToast(null), 1800);
+  }, []);
+
+  const handleFill = useCallback(
+    async (_account: TwoFactorAccount, code: string) => {
+      const res = await requestAutofill(code);
+      flash(res.ok ? 'Filled on page' : res.error || 'No code field found');
+    },
+    [flash]
+  );
+
+  const openManager = async () => {
     try {
-      // Try to open the side panel (Chrome 116+)
       if (chrome?.sidePanel?.open) {
         await chrome.sidePanel.open({ windowId: chrome.windows?.WINDOW_ID_CURRENT });
-      } else {
-        // Fallback: open sidepanel in a new tab
-        const url = chrome.runtime.getURL('sidepanel/index.html');
-        await chrome.tabs.create({ url });
+        window.close();
+        return;
       }
     } catch {
-      // Final fallback
-      const url = chrome.runtime.getURL('sidepanel/index.html');
-      await chrome.tabs.create({ url });
+      /* fall through */
     }
+    const url = chrome.runtime.getURL('sidepanel/index.html');
+    await chrome.tabs.create({ url });
+    window.close();
   };
+
+  const commands = useMemo<Command[]>(() => {
+    const accountCmds: Command[] = sortAccounts(accounts).flatMap((a) => {
+      const code = codes.get(a.id) ?? '';
+      return [
+        {
+          id: `copy-${a.id}`,
+          title: `Copy ${a.issuer}`,
+          subtitle: a.label || undefined,
+          icon: <Copy size={16} />,
+          keywords: `${a.label ?? ''} ${(a.tags ?? []).join(' ')}`,
+          run: () => {
+            void copyWithClear(code, clearSeconds);
+            flash(`Copied ${a.issuer}`);
+          },
+        },
+        {
+          id: `fill-${a.id}`,
+          title: `Fill ${a.issuer} on page`,
+          icon: <Wand2 size={16} />,
+          keywords: 'autofill',
+          run: () => handleFill(a, code),
+        },
+      ];
+    });
+    const actions: Command[] = [
+      { id: 'act-manager', title: 'Open manager', icon: <PanelRight size={16} />, run: openManager },
+      {
+        id: 'act-theme',
+        title: 'Cycle theme (system / light / dark)',
+        icon: <CommandIcon size={16} />,
+        keywords: 'dark light appearance',
+        run: () => setTheme(theme === 'system' ? 'light' : theme === 'light' ? 'dark' : 'system'),
+      },
+      {
+        id: 'act-lock',
+        title: 'Lock vault',
+        icon: <Lock size={16} />,
+        run: () => {
+          void sendMessage({ type: 'LOCK' }).then(() => window.close());
+        },
+      },
+    ];
+    return [...accountCmds, ...actions];
+  }, [accounts, codes, clearSeconds, flash, handleFill, setTheme, theme]);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="w-6 h-6 border-2 border-gray-600 border-t-emerald-500 rounded-full animate-spin" />
+        <Spinner size={22} />
       </div>
     );
   }
 
   return (
     <div className="flex flex-col h-full">
+      {/* Header */}
+      <header className="flex items-center gap-2 px-4 h-14 border-b border-border">
+        <Logo size={19} />
+        <div className="flex-1" />
+        <IconButton label="Command palette (⌘K)" size="sm" onClick={() => setPaletteOpen(true)}>
+          <CommandIcon size={16} />
+        </IconButton>
+        <ThemeToggle size="sm" />
+        <IconButton label="Open manager" size="sm" onClick={openManager}>
+          <PanelRight size={17} />
+        </IconButton>
+      </header>
+
       {/* Search */}
-      <div className="px-3 pt-3 pb-2">
-        <SearchBar value={search} onChange={setSearch} />
+      <div className="px-4 pt-3 pb-2">
+        <SearchBar value={search} onChange={setSearch} autoFocus />
       </div>
 
-      {/* Account list */}
-      <div className="flex-1 overflow-y-auto px-1">
-        {filteredAccounts.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center px-8">
-            <svg
-              width="48"
-              height="48"
-              viewBox="0 0 24 24"
-              fill="none"
-              className="text-gray-600 mb-3"
-            >
-              <path
-                d="M12 2L3 7v5c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            <p className="text-sm text-gray-400 mb-1">
-              {search ? 'No matching accounts' : 'No 2FA accounts yet'}
-            </p>
-            {!search && (
-              <p className="text-xs text-gray-500">
-                Open Manager to add accounts
-              </p>
-            )}
-          </div>
+      {/* List */}
+      <div className="flex-1 overflow-y-auto px-2 pb-2">
+        {visible.length === 0 ? (
+          <EmptyState
+            className="h-full"
+            icon={<ShieldCheck size={26} />}
+            title={search ? 'No matches' : 'No accounts yet'}
+            description={
+              search
+                ? 'Try a different name or tag.'
+                : 'Open the manager to add your first 2FA account, or scan a QR code on any page.'
+            }
+            action={
+              !search && (
+                <Button size="sm" onClick={openManager}>
+                  Open manager
+                </Button>
+              )
+            }
+          />
         ) : (
           <div className="space-y-0.5">
-            {filteredAccounts.map((account) => (
+            {visible.map((account) => (
               <TOTPCard
                 key={account.id}
                 account={account}
                 code={codes.get(account.id) ?? '------'}
                 remainingSeconds={remainingSeconds}
                 period={account.period}
+                clearSeconds={vault?.settings?.clipboardClearSeconds ?? 0}
+                onFill={handleFill}
               />
             ))}
           </div>
@@ -98,14 +178,23 @@ export default function TOTPList() {
       </div>
 
       {/* Footer */}
-      <div className="px-3 py-2.5 border-t border-gray-800">
+      <footer className="px-4 py-2.5 border-t border-border">
         <button
-          onClick={handleOpenManager}
-          className="w-full text-sm text-emerald-400 hover:text-emerald-300 font-medium py-1.5 rounded-lg hover:bg-gray-800/50 transition-colors duration-150"
+          onClick={openManager}
+          className="w-full text-sm text-accent hover:brightness-110 font-medium py-1.5 rounded-md hover:bg-accent-soft transition-colors duration-150"
         >
-          Open Manager
+          Open manager
         </button>
-      </div>
+      </footer>
+
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} commands={commands} />
+
+      {/* Toast */}
+      {toast && (
+        <div className="pointer-events-none absolute bottom-16 left-1/2 -translate-x-1/2 rounded-full bg-surface-2 border border-border px-3.5 py-1.5 text-xs text-text shadow-pop animate-fade-in">
+          {toast}
+        </div>
+      )}
     </div>
   );
 }

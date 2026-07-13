@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { ArrowLeft, Paperclip, Trash2 } from 'lucide-react';
 import { useMail } from '@hooks/useMail';
 import type { MailMessageDetail } from '@shared/types';
+import { Button, IconButton, Spinner } from '@shared/ui';
 
 interface MessageViewerProps {
   accountId: string;
@@ -59,7 +61,7 @@ export default function MessageViewer({ accountId, messageId, onBack }: MessageV
   if (loading && !message) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="w-5 h-5 border-2 border-gray-600 border-t-emerald-500 rounded-full animate-spin" />
+        <Spinner size={22} />
       </div>
     );
   }
@@ -67,13 +69,10 @@ export default function MessageViewer({ accountId, messageId, onBack }: MessageV
   if (error && !message) {
     return (
       <div className="flex flex-col items-center justify-center h-full px-8">
-        <p className="text-sm text-red-400 mb-3">{error}</p>
-        <button
-          onClick={onBack}
-          className="text-sm text-gray-400 hover:text-white transition-colors duration-150"
-        >
+        <p className="text-sm text-danger mb-3">{error}</p>
+        <Button variant="secondary" size="sm" onClick={onBack}>
           Go back
-        </button>
+        </Button>
       </div>
     );
   }
@@ -83,77 +82,63 @@ export default function MessageViewer({ accountId, messageId, onBack }: MessageV
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-800">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-white transition-colors duration-150"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
+      <header className="flex items-center justify-between px-3 h-14 border-b border-border">
+        <Button variant="ghost" size="sm" onClick={onBack}>
+          <ArrowLeft size={16} />
           Back
-        </button>
+        </Button>
 
         <div className="flex items-center gap-1">
           {confirmDelete ? (
             <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-400">Delete?</span>
-              <button
-                onClick={handleDelete}
-                disabled={deleting}
-                className="px-2.5 py-1 text-xs text-white bg-red-600 hover:bg-red-500 rounded transition-colors duration-150 disabled:opacity-50"
-              >
+              <span className="text-xs text-text-secondary">Delete?</span>
+              <Button variant="danger" size="sm" onClick={handleDelete} disabled={deleting}>
                 {deleting ? 'Deleting...' : 'Yes'}
-              </button>
-              <button
-                onClick={() => setConfirmDelete(false)}
-                className="px-2.5 py-1 text-xs text-gray-300 bg-gray-700 hover:bg-gray-600 rounded transition-colors duration-150"
-              >
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => setConfirmDelete(false)}>
                 No
-              </button>
+              </Button>
             </div>
           ) : (
-            <button
+            <IconButton
+              label="Delete message"
+              size="sm"
               onClick={() => setConfirmDelete(true)}
-              className="p-1.5 rounded-md text-gray-400 hover:text-red-400 hover:bg-gray-800 transition-colors duration-150"
-              title="Delete message"
+              className="hover:text-danger"
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="3 6 5 6 21 6" />
-                <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
-              </svg>
-            </button>
+              <Trash2 size={16} />
+            </IconButton>
           )}
         </div>
-      </div>
+      </header>
 
       {/* Message content */}
       <div className="flex-1 overflow-y-auto">
         {/* Message header */}
-        <div className="px-4 py-4 border-b border-gray-800/50">
-          <h2 className="text-lg font-semibold text-white mb-3">
+        <div className="px-4 py-4 border-b border-border">
+          <h2 className="font-display text-lg font-semibold text-text mb-3">
             {message.subject || '(No subject)'}
           </h2>
 
           <div className="space-y-1.5">
             <div className="flex items-start gap-2">
-              <span className="text-xs text-gray-500 w-10 pt-0.5 flex-shrink-0">From</span>
+              <span className="text-xs text-text-muted w-10 pt-0.5 flex-shrink-0">From</span>
               <div className="text-sm">
                 {message.from?.name && (
-                  <span className="text-white font-medium">{message.from.name} </span>
+                  <span className="text-text font-medium">{message.from.name} </span>
                 )}
-                <span className="text-gray-400">&lt;{message.from?.address ?? 'unknown'}&gt;</span>
+                <span className="text-text-secondary">&lt;{message.from?.address ?? 'unknown'}&gt;</span>
               </div>
             </div>
             <div className="flex items-start gap-2">
-              <span className="text-xs text-gray-500 w-10 pt-0.5 flex-shrink-0">To</span>
-              <div className="text-sm text-gray-400">
+              <span className="text-xs text-text-muted w-10 pt-0.5 flex-shrink-0">To</span>
+              <div className="text-sm text-text-secondary">
                 {(message.to ?? []).map((t) => t.address).join(', ') || 'unknown'}
               </div>
             </div>
             <div className="flex items-start gap-2">
-              <span className="text-xs text-gray-500 w-10 pt-0.5 flex-shrink-0">Date</span>
-              <span className="text-sm text-gray-400">{message.createdAt ? formatFullDate(message.createdAt) : 'Unknown date'}</span>
+              <span className="text-xs text-text-muted w-10 pt-0.5 flex-shrink-0">Date</span>
+              <span className="text-sm text-text-secondary">{message.createdAt ? formatFullDate(message.createdAt) : 'Unknown date'}</span>
             </div>
           </div>
 
@@ -166,13 +151,11 @@ export default function MessageViewer({ accountId, messageId, onBack }: MessageV
                   href={att.downloadUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-xs text-gray-300 hover:text-white hover:border-gray-600 transition-colors duration-150"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-surface-2 border border-border rounded-md text-xs text-text-secondary hover:text-text hover:border-border-strong transition-colors duration-150"
                 >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
-                  </svg>
+                  <Paperclip size={12} />
                   <span className="truncate max-w-[150px]">{att.filename}</span>
-                  <span className="text-gray-500">({formatFileSize(att.size)})</span>
+                  <span className="text-text-muted">({formatFileSize(att.size)})</span>
                 </a>
               ))}
             </div>
@@ -202,7 +185,7 @@ export default function MessageViewer({ accountId, messageId, onBack }: MessageV
               }}
             />
           ) : (
-            <pre className="text-sm text-gray-300 whitespace-pre-wrap font-sans leading-relaxed">
+            <pre className="text-sm text-text-secondary whitespace-pre-wrap font-sans leading-relaxed">
               {message.text || '(No content)'}
             </pre>
           )}

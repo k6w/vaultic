@@ -10,7 +10,9 @@
     "activeTab",
     "scripting",
     "sidePanel",
-    "notifications"
+    "notifications",
+    "clipboardRead",
+    "clipboardWrite"
   ],
   "action": {
     "default_popup": "popup/index.html",

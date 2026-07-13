@@ -1,6 +1,8 @@
 import { useState, useCallback } from 'react';
+import { Mail, Plus } from 'lucide-react';
 import { useVault } from '@hooks/useVault';
 import { useMail } from '@hooks/useMail';
+import { Button, EmptyState } from '@shared/ui';
 import MailAccountList from './MailAccountList';
 import Inbox from './Inbox';
 import MessageViewer from './MessageViewer';
@@ -60,28 +62,19 @@ export default function MailTab() {
   // Empty state: no mail accounts
   if (mailAccounts.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-center px-8">
-        <div className="w-14 h-14 rounded-2xl bg-gray-800/80 flex items-center justify-center mb-4">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" className="text-gray-500">
-            <path
-              d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"
-              stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
-            />
-            <polyline points="22,6 12,13 2,6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </div>
-        <p className="text-base font-medium text-gray-300 mb-1">Temporary Email</p>
-        <p className="text-sm text-gray-500 mb-5">Create a disposable email address</p>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors duration-150"
-        >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          Create Email
-        </button>
+      <div className="flex flex-col h-full">
+        <EmptyState
+          className="h-full"
+          icon={<Mail size={26} />}
+          title="Temporary Email"
+          description="Create a disposable inbox to sign up anywhere without exposing your real address."
+          action={
+            <Button size="sm" onClick={() => setShowCreateModal(true)}>
+              <Plus size={16} />
+              Create Email
+            </Button>
+          }
+        />
 
         {showCreateModal && (
           <CreateMailAccount
@@ -99,19 +92,13 @@ export default function MailTab() {
       {view === 'accounts' && (
         <>
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800/60">
-            <h1 className="text-base font-semibold text-white">Mail Accounts</h1>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="flex items-center gap-1.5 text-xs font-medium text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/15 px-2.5 py-1.5 rounded-md transition-colors duration-150"
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
+          <header className="flex items-center justify-between px-4 h-14 border-b border-border">
+            <h1 className="font-display text-base font-semibold text-text">Mail Accounts</h1>
+            <Button size="sm" variant="soft" onClick={() => setShowCreateModal(true)}>
+              <Plus size={15} />
               New
-            </button>
-          </div>
+            </Button>
+          </header>
 
           {/* Accounts */}
           <MailAccountList

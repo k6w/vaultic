@@ -12,11 +12,28 @@ export const DEFAULT_SETTINGS: UserSettings = {
   autoDetectQR: true,
   notifyNewMail: true,
   autoLockMinutes: 5,
-  theme: 'dark',
+  theme: 'system',
+  clipboardClearSeconds: 20,
+  biometricUnlock: false,
+  listDensity: 'comfortable',
 };
 
 export const DEFAULT_VAULT: VaultData = {
   accounts: [],
   mailAccounts: [],
+  folders: [],
   settings: DEFAULT_SETTINGS,
 };
+
+/**
+ * Normalize a vault loaded from storage so older vaults gain new fields with
+ * sensible defaults (folders array, widened settings). Non-destructive.
+ */
+export function migrateVault(vault: VaultData): VaultData {
+  return {
+    accounts: vault.accounts ?? [],
+    mailAccounts: vault.mailAccounts ?? [],
+    folders: vault.folders ?? [],
+    settings: { ...DEFAULT_SETTINGS, ...(vault.settings ?? {}) },
+  };
+}

@@ -1,18 +1,25 @@
 import { useState, useEffect } from 'react';
+import { ChevronRight, AlertCircle } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { sendMessage } from '@shared/messages';
 import { parseOTPAuthURI } from '@shared/totp';
-import type { TwoFactorAccount } from '@shared/types';
+import type { TwoFactorAccount, Folder } from '@shared/types';
+import { Modal, Input, Textarea, Field, Button, Tag, cn } from '@shared/ui';
 
 interface AccountFormProps {
   account?: TwoFactorAccount;
+  folders: Folder[];
   onSave: (account: TwoFactorAccount) => void;
   onClose: () => void;
 }
 
 const BASE32_REGEX = /^[A-Z2-7=]+$/i;
 
-export default function AccountForm({ account, onSave, onClose }: AccountFormProps) {
+const fieldCls =
+  'w-full h-10 bg-surface-2 border border-border text-text rounded-md px-3 text-sm ' +
+  'focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent transition-colors';
+
+export default function AccountForm({ account, folders, onSave, onClose }: AccountFormProps) {
   const isEditing = !!account;
 
   const [issuer, setIssuer] = useState(account?.issuer ?? '');
@@ -21,11 +28,15 @@ export default function AccountForm({ account, onSave, onClose }: AccountFormPro
   const [algorithm, setAlgorithm] = useState<TwoFactorAccount['algorithm']>(account?.algorithm ?? 'SHA1');
   const [digits, setDigits] = useState<TwoFactorAccount['digits']>(account?.digits ?? 6);
   const [period, setPeriod] = useState(account?.period ?? 30);
+  const [folderId, setFolderId] = useState<string>(account?.folderId ?? '');
+  const [tags, setTags] = useState<string[]>(account?.tags ?? []);
+  const [tagInput, setTagInput] = useState('');
+  const [note, setNote] = useState(account?.note ?? '');
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // Smart detection: if user pastes an otpauth:// URI into the secret field, auto-parse it
+  // Smart detection: pasting an otpauth:// URI auto-parses it.
   useEffect(() => {
     if (secret.trim().startsWith('otpauth://')) {
       try {
@@ -38,7 +49,7 @@ export default function AccountForm({ account, onSave, onClose }: AccountFormPro
         if (parsed.period) setPeriod(parsed.period);
         setError(null);
       } catch {
-        // Not a valid URI, let user continue typing
+        /* keep typing */
       }
     }
   }, [secret]);
@@ -47,22 +58,23 @@ export default function AccountForm({ account, onSave, onClose }: AccountFormPro
 
   const validate = (): string | null => {
     if (!cleanSecret) return 'Secret key is required';
-    if (!BASE32_REGEX.test(cleanSecret)) {
-      return 'Invalid secret key. Must contain only letters A-Z and digits 2-7.';
-    }
-    if (period < 1) return 'Period must be at least 1';
+    if (!BASE32_REGEX.test(cleanSecret))
+      return 'Invalid secret key — use only letters A–Z and digits 2–7.';
+    if (period < 1) return 'Period must be at least 1 second';
     return null;
+  };
+
+  const addTag = (raw: string) => {
+    const t = raw.trim().toLowerCase();
+    if (t && !tags.includes(t)) setTags([...tags, t]);
+    setTagInput('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-
     const validationError = validate();
-    if (validationError) {
-      setError(validationError);
-      return;
-    }
+    if (validationError) return setError(validationError);
 
     setSaving(true);
     try {
@@ -75,16 +87,20 @@ export default function AccountForm({ account, onSave, onClose }: AccountFormPro
         algorithm,
         digits,
         period,
+        icon: account?.icon,
+        folderId: folderId || undefined,
+        tags: tags.length ? tags : undefined,
+        note: note.trim() || undefined,
+        pinned: account?.pinned,
+        sortOrder: account?.sortOrder,
         createdAt: account?.createdAt ?? now,
         updatedAt: now,
       };
 
-      if (isEditing) {
-        await sendMessage({ type: 'UPDATE_ACCOUNT', account: accountData });
-      } else {
-        await sendMessage({ type: 'ADD_ACCOUNT', account: accountData });
-      }
-
+      await sendMessage({
+        type: isEditing ? 'UPDATE_ACCOUNT' : 'ADD_ACCOUNT',
+        account: accountData,
+      });
       onSave(accountData);
     } catch (err) {
       setError((err as Error).message);
@@ -93,165 +109,144 @@ export default function AccountForm({ account, onSave, onClose }: AccountFormPro
     }
   };
 
+  const advancedModified = algorithm !== 'SHA1' || digits !== 6 || period !== 30;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 max-w-md w-full mx-4 shadow-xl max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-lg font-semibold text-white">
-            {isEditing ? 'Edit Account' : 'Add Account'}
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-300 transition-colors duration-150"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
+    <Modal
+      open
+      onClose={onClose}
+      title={isEditing ? 'Edit account' : 'Add account'}
+      size="md"
+      footer={
+        <>
+          <Button variant="secondary" size="sm" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button size="sm" onClick={handleSubmit} disabled={saving}>
+            {saving ? 'Saving…' : isEditing ? 'Save changes' : 'Add account'}
+          </Button>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <Field label="Secret key *" hint="Paste the secret or a full otpauth:// URI">
+          <Input
+            value={secret}
+            onChange={(e) => setSecret(e.target.value)}
+            placeholder="e.g. I65VU7K5ZQL7WB4E"
+            autoFocus={!isEditing}
+            className="font-mono tracking-wider"
+          />
+        </Field>
+
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Service name">
+            <Input value={issuer} onChange={(e) => setIssuer(e.target.value)} placeholder="GitHub" />
+          </Field>
+          <Field label="Account / email">
+            <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="you@example.com" />
+          </Field>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Secret Key - the primary field */}
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1.5">
-              Secret Key <span className="text-red-400">*</span>
-            </label>
-            <input
-              type="text"
-              value={secret}
-              onChange={(e) => setSecret(e.target.value)}
-              placeholder="e.g. I65VU7K5ZQL7WB4E"
-              autoFocus={!isEditing}
-              className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2.5 text-sm font-mono tracking-wider placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-colors duration-150"
-            />
-            <p className="mt-1 text-xs text-gray-500">
-              Paste the secret key or an otpauth:// URI
-            </p>
-          </div>
+        <Field label="Folder">
+          <select value={folderId} onChange={(e) => setFolderId(e.target.value)} className={fieldCls}>
+            <option value="">Ungrouped</option>
+            {folders.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.name}
+              </option>
+            ))}
+          </select>
+        </Field>
 
-          {/* Service Name */}
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1.5">
-              Service Name
-            </label>
+        <Field label="Tags" hint="Press Enter or comma to add">
+          <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border bg-surface-2 px-2 py-1.5 focus-within:ring-2 focus-within:ring-accent/40">
+            {tags.map((t) => (
+              <Tag key={t} onRemove={() => setTags(tags.filter((x) => x !== t))}>
+                {t}
+              </Tag>
+            ))}
             <input
-              type="text"
-              value={issuer}
-              onChange={(e) => setIssuer(e.target.value)}
-              placeholder="e.g. GitHub, Google, Discord"
-              className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2.5 text-sm placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-colors duration-150"
-            />
-          </div>
-
-          {/* Account / Email */}
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1.5">
-              Account / Email
-            </label>
-            <input
-              type="text"
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              placeholder="e.g. user@example.com"
-              className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2.5 text-sm placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-colors duration-150"
+              value={tagInput}
+              onChange={(e) => setTagInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ',') {
+                  e.preventDefault();
+                  addTag(tagInput);
+                } else if (e.key === 'Backspace' && !tagInput && tags.length) {
+                  setTags(tags.slice(0, -1));
+                }
+              }}
+              placeholder={tags.length ? '' : 'work, personal…'}
+              className="min-w-[80px] flex-1 bg-transparent text-sm text-text placeholder:text-text-muted focus:outline-none"
             />
           </div>
+        </Field>
 
-          {/* Advanced Settings (collapsed by default) */}
-          <div>
-            <button
-              type="button"
-              onClick={() => setShowAdvanced(!showAdvanced)}
-              className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 transition-colors duration-150"
-            >
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className={`transition-transform duration-150 ${showAdvanced ? 'rotate-90' : ''}`}
-              >
-                <polyline points="9 18 15 12 9 6" />
-              </svg>
-              Advanced Settings
-              {(algorithm !== 'SHA1' || digits !== 6 || period !== 30) && (
-                <span className="text-emerald-500">(modified)</span>
-              )}
-            </button>
+        {/* Advanced */}
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="flex items-center gap-1 text-xs text-text-secondary hover:text-text transition-colors"
+          >
+            <ChevronRight size={13} className={cn('transition-transform', showAdvanced && 'rotate-90')} />
+            Advanced
+            {advancedModified && <span className="text-accent">· modified</span>}
+          </button>
 
-            {showAdvanced && (
-              <div className="grid grid-cols-3 gap-3 mt-3">
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Algorithm</label>
+          {showAdvanced && (
+            <div className="mt-3 space-y-3">
+              <div className="grid grid-cols-3 gap-3">
+                <Field label="Algorithm">
                   <select
                     value={algorithm}
                     onChange={(e) => setAlgorithm(e.target.value as TwoFactorAccount['algorithm'])}
-                    className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-colors duration-150"
+                    className={fieldCls}
                   >
                     <option value="SHA1">SHA-1</option>
                     <option value="SHA256">SHA-256</option>
                     <option value="SHA512">SHA-512</option>
                   </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Digits</label>
+                </Field>
+                <Field label="Digits">
                   <select
                     value={digits}
                     onChange={(e) => setDigits(Number(e.target.value) as TwoFactorAccount['digits'])}
-                    className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-colors duration-150"
+                    className={fieldCls}
                   >
                     <option value={6}>6</option>
                     <option value={8}>8</option>
                   </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Period (s)</label>
-                  <input
+                </Field>
+                <Field label="Period (s)">
+                  <Input
                     type="number"
                     value={period}
                     onChange={(e) => setPeriod(Number(e.target.value))}
                     min={1}
-                    className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-colors duration-150"
                   />
-                </div>
+                </Field>
               </div>
-            )}
-          </div>
-
-          {/* Error */}
-          {error && (
-            <div className="bg-red-900/20 border border-red-800/50 rounded-lg px-3 py-2">
-              <p className="text-red-400 text-xs">{error}</p>
+              <Field label="Secure note" hint="Stored encrypted — e.g. recovery codes">
+                <Textarea
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="Backup / recovery codes…"
+                  rows={3}
+                />
+              </Field>
             </div>
           )}
+        </div>
 
-          {/* Buttons */}
-          <div className="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-sm text-gray-300 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors duration-150"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="px-4 py-2 text-sm text-white bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-600/50 disabled:cursor-not-allowed rounded-lg transition-colors duration-150"
-            >
-              {saving ? 'Saving...' : isEditing ? 'Save Changes' : 'Add Account'}
-            </button>
+        {error && (
+          <div className="flex items-start gap-2 rounded-md bg-danger-soft px-3 py-2 text-danger">
+            <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />
+            <p className="text-xs">{error}</p>
           </div>
-        </form>
-      </div>
-    </div>
+        )}
+      </form>
+    </Modal>
   );
 }

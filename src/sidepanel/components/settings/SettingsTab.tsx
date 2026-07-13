@@ -1,39 +1,36 @@
 import { useState, useEffect, useCallback } from 'react';
+import {
+  Monitor,
+  Sun,
+  Moon,
+  KeyRound,
+  Lock,
+  Fingerprint,
+  ChevronRight,
+  AlertTriangle,
+  Trash2,
+} from 'lucide-react';
 import { sendMessage } from '@shared/messages';
-import type { UserSettings } from '@shared/types';
+import type { UserSettings, ThemePreference, ListDensity } from '@shared/types';
+import { useTheme } from '@hooks/useTheme';
+import {
+  isBiometricSupported,
+  isBiometricEnrolled,
+  enrollBiometric,
+  disableBiometric,
+} from '@shared/biometric';
+import {
+  Card,
+  Button,
+  Toggle,
+  SegmentedControl,
+  Input,
+  Field,
+  Modal,
+  Spinner,
+  cn,
+} from '@shared/ui';
 import PasswordChange from './PasswordChange';
-
-// ── Toggle Switch ──────────────────────────────────────────────────────
-
-function Toggle({
-  checked,
-  onChange,
-  label,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  label: string;
-}) {
-  return (
-    <label className="flex items-center justify-between cursor-pointer">
-      <span className="text-sm text-gray-300">{label}</span>
-      <button
-        role="switch"
-        aria-checked={checked}
-        onClick={() => onChange(!checked)}
-        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ${
-          checked ? 'bg-emerald-600' : 'bg-gray-600'
-        }`}
-      >
-        <span
-          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
-            checked ? 'translate-x-6' : 'translate-x-1'
-          }`}
-        />
-      </button>
-    </label>
-  );
-}
 
 // ── Auto-lock options ──────────────────────────────────────────────────
 
@@ -45,15 +42,74 @@ const AUTO_LOCK_OPTIONS = [
   { value: 0, label: 'Never' },
 ];
 
+const CLIPBOARD_OPTIONS = [
+  { value: '0', label: 'Off' },
+  { value: '10', label: '10s' },
+  { value: '20', label: '20s' },
+  { value: '30', label: '30s' },
+  { value: '60', label: '60s' },
+];
+
+const DEFAULT_SETTINGS: UserSettings = {
+  autoDetectQR: true,
+  notifyNewMail: true,
+  autoLockMinutes: 5,
+  theme: 'system',
+  clipboardClearSeconds: 0,
+  biometricUnlock: false,
+  listDensity: 'comfortable',
+};
+
+// ── Small layout helpers ───────────────────────────────────────────────
+
+function SectionHeader({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 className="mb-2 px-1 text-xs font-medium uppercase tracking-wider text-text-muted">
+      {children}
+    </h2>
+  );
+}
+
+function Row({
+  label,
+  hint,
+  control,
+  className,
+}: {
+  label: React.ReactNode;
+  hint?: React.ReactNode;
+  control: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn('flex items-center justify-between gap-3', className)}>
+      <div className="min-w-0">
+        <p className="text-sm text-text">{label}</p>
+        {hint && <p className="mt-0.5 text-xs text-text-muted">{hint}</p>}
+      </div>
+      <div className="flex-shrink-0">{control}</div>
+    </div>
+  );
+}
+
 // ── Main Component ─────────────────────────────────────────────────────
 
 export default function SettingsTab() {
+  const { theme, setTheme } = useTheme();
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [showPasswordChange, setShowPasswordChange] = useState(false);
   const [clearStep, setClearStep] = useState<'idle' | 'confirm' | 'type-delete'>('idle');
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [clearing, setClearing] = useState(false);
+
+  // Biometric state
+  const [bioSupported, setBioSupported] = useState<boolean | null>(null);
+  const [bioEnrolled, setBioEnrolled] = useState(false);
+  const [bioModalOpen, setBioModalOpen] = useState(false);
+  const [bioPassword, setBioPassword] = useState('');
+  const [bioError, setBioError] = useState<string | null>(null);
+  const [bioBusy, setBioBusy] = useState(false);
 
   // Load settings on mount
   const loadSettings = useCallback(async () => {
@@ -62,17 +118,10 @@ export default function SettingsTab() {
       const response = await sendMessage<{ settings?: UserSettings; error?: string }>({
         type: 'GET_SETTINGS',
       });
-      if (response.settings) {
-        setSettings(response.settings);
-      }
+      setSettings({ ...DEFAULT_SETTINGS, ...(response.settings ?? {}) });
     } catch {
       // Use defaults
-      setSettings({
-        autoDetectQR: true,
-        notifyNewMail: true,
-        autoLockMinutes: 5,
-        theme: 'dark',
-      });
+      setSettings(DEFAULT_SETTINGS);
     } finally {
       setLoading(false);
     }
@@ -82,10 +131,28 @@ export default function SettingsTab() {
     loadSettings();
   }, [loadSettings]);
 
+  // Detect biometric support / enrollment on mount
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const supported = await isBiometricSupported();
+      if (!active) return;
+      setBioSupported(supported);
+      if (supported) {
+        const enrolled = await isBiometricEnrolled();
+        if (active) setBioEnrolled(enrolled);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
   // Save a single setting immediately
   const updateSetting = async <K extends keyof UserSettings>(key: K, value: UserSettings[K]) => {
     if (!settings) return;
 
+    const previous = settings;
     const updated = { ...settings, [key]: value };
     setSettings(updated);
 
@@ -93,8 +160,14 @@ export default function SettingsTab() {
       await sendMessage({ type: 'UPDATE_SETTINGS', settings: { [key]: value } });
     } catch {
       // Revert on failure
-      setSettings(settings);
+      setSettings(previous);
     }
+  };
+
+  // Appearance: theme is stored both outside the vault (applied instantly) and in settings.
+  const handleThemeChange = (value: ThemePreference) => {
+    setTheme(value);
+    updateSetting('theme', value);
   };
 
   // Lock now
@@ -104,6 +177,59 @@ export default function SettingsTab() {
       window.location.reload();
     } catch {
       // ignore
+    }
+  };
+
+  // ── Biometric handlers ─────────────────────────────────────────────
+
+  const handleBiometricToggle = async (next: boolean) => {
+    setBioError(null);
+    if (next) {
+      // Enrolling requires the master password → prompt in a modal.
+      setBioPassword('');
+      setBioModalOpen(true);
+      return;
+    }
+    // Turning off.
+    setBioBusy(true);
+    try {
+      await disableBiometric();
+      await sendMessage({ type: 'UPDATE_SETTINGS', settings: { biometricUnlock: false } });
+      setBioEnrolled(false);
+      setSettings((s) => (s ? { ...s, biometricUnlock: false } : s));
+    } catch (err) {
+      setBioError((err as Error).message);
+    } finally {
+      setBioBusy(false);
+    }
+  };
+
+  const confirmBiometricEnroll = async () => {
+    setBioError(null);
+    if (!bioPassword) {
+      setBioError('Enter your master password to continue.');
+      return;
+    }
+    setBioBusy(true);
+    try {
+      const res = await sendMessage<{ valid?: boolean }>({
+        type: 'VERIFY_PASSWORD',
+        password: bioPassword,
+      });
+      if (!res.valid) {
+        setBioError('Incorrect master password.');
+        return;
+      }
+      await enrollBiometric(bioPassword);
+      await sendMessage({ type: 'UPDATE_SETTINGS', settings: { biometricUnlock: true } });
+      setBioEnrolled(true);
+      setSettings((s) => (s ? { ...s, biometricUnlock: true } : s));
+      setBioModalOpen(false);
+      setBioPassword('');
+    } catch (err) {
+      setBioError((err as Error).message || 'Could not enable biometric unlock.');
+    } finally {
+      setBioBusy(false);
     }
   };
 
@@ -138,190 +264,298 @@ export default function SettingsTab() {
   // Loading state
   if (loading || !settings) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+      <div className="flex h-full items-center justify-center">
+        <Spinner size={24} />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full flex-col">
       {/* Header */}
-      <div className="px-5 pt-5 pb-3">
-        <h1 className="text-lg font-semibold text-white">Settings</h1>
+      <div className="px-4 pt-4 pb-2">
+        <h1 className="font-display text-base font-semibold text-text">Settings</h1>
       </div>
 
       {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto px-5 pb-5 space-y-5">
-        {/* ── General ──────────────────────────────────────────────── */}
+      <div className="flex-1 overflow-y-auto px-4 pb-6 space-y-6">
+        {/* ── Appearance ───────────────────────────────────────────── */}
         <section>
-          <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-3">
-            General
-          </h2>
-          <div className="space-y-4 p-4 rounded-lg bg-gray-900 border border-gray-700">
-            <Toggle
-              checked={settings.autoDetectQR}
-              onChange={(v) => updateSetting('autoDetectQR', v)}
-              label="Auto-detect QR codes on pages"
+          <SectionHeader>Appearance</SectionHeader>
+          <Card className="space-y-4">
+            <Row
+              label="Theme"
+              hint="System follows your device setting."
+              control={
+                <SegmentedControl<ThemePreference>
+                  value={theme}
+                  onChange={handleThemeChange}
+                  ariaLabel="Theme"
+                  options={[
+                    { value: 'system', icon: <Monitor size={15} /> },
+                    { value: 'light', icon: <Sun size={15} /> },
+                    { value: 'dark', icon: <Moon size={15} /> },
+                  ]}
+                />
+              }
             />
-            <Toggle
-              checked={settings.notifyNewMail}
-              onChange={(v) => updateSetting('notifyNewMail', v)}
-              label="Notify on new emails"
+            <Row
+              label="List density"
+              hint="How tightly accounts are packed."
+              control={
+                <SegmentedControl<ListDensity>
+                  value={settings.listDensity}
+                  onChange={(v) => updateSetting('listDensity', v)}
+                  ariaLabel="List density"
+                  options={[
+                    { value: 'comfortable', label: 'Comfortable' },
+                    { value: 'compact', label: 'Compact' },
+                  ]}
+                />
+              }
             />
+          </Card>
+        </section>
 
-            {/* Auto-lock timeout */}
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-300">Auto-lock timeout</span>
-              <select
-                value={settings.autoLockMinutes}
-                onChange={(e) => updateSetting('autoLockMinutes', Number(e.target.value))}
-                className="bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-colors duration-150"
-              >
-                {AUTO_LOCK_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+        {/* ── Behavior ─────────────────────────────────────────────── */}
+        <section>
+          <SectionHeader>Behavior</SectionHeader>
+          <Card className="space-y-4">
+            <Row
+              label="Auto-detect QR codes on pages"
+              hint="Spot 2FA QR codes while you browse."
+              control={
+                <Toggle
+                  checked={settings.autoDetectQR}
+                  onChange={(v) => updateSetting('autoDetectQR', v)}
+                  label="Auto-detect QR codes on pages"
+                />
+              }
+            />
+            <Row
+              label="Notify on new emails"
+              hint="Show a notification when mail arrives."
+              control={
+                <Toggle
+                  checked={settings.notifyNewMail}
+                  onChange={(v) => updateSetting('notifyNewMail', v)}
+                  label="Notify on new emails"
+                />
+              }
+            />
+            <Row
+              label="Auto-lock timeout"
+              hint="Lock the vault after inactivity."
+              control={
+                <select
+                  value={settings.autoLockMinutes}
+                  onChange={(e) => updateSetting('autoLockMinutes', Number(e.target.value))}
+                  className="h-9 rounded-md border border-border bg-surface-2 px-3 text-sm text-text focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent"
+                >
+                  {AUTO_LOCK_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              }
+            />
+          </Card>
         </section>
 
         {/* ── Security ─────────────────────────────────────────────── */}
         <section>
-          <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-3">
-            Security
-          </h2>
-          <div className="space-y-3 p-4 rounded-lg bg-gray-900 border border-gray-700">
-            <button
-              onClick={() => setShowPasswordChange(true)}
-              className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors duration-150 group"
-            >
-              <div className="flex items-center gap-3">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400 group-hover:text-white transition-colors duration-150">
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                  <path d="M7 11V7a5 5 0 0110 0v4" />
-                </svg>
-                <span className="text-sm text-gray-300 group-hover:text-white transition-colors duration-150">
-                  Change Master Password
-                </span>
-              </div>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500">
-                <polyline points="9 18 15 12 9 6" />
-              </svg>
-            </button>
+          <SectionHeader>Security</SectionHeader>
+          <Card className="space-y-4">
+            <Row
+              label="Clear clipboard after copy"
+              hint="Wipe copied codes from the clipboard automatically."
+              control={
+                <SegmentedControl
+                  size="sm"
+                  value={String(settings.clipboardClearSeconds)}
+                  onChange={(v) => updateSetting('clipboardClearSeconds', Number(v))}
+                  ariaLabel="Clear clipboard after copy"
+                  options={CLIPBOARD_OPTIONS}
+                />
+              }
+            />
 
-            <button
-              onClick={handleLockNow}
-              className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors duration-150 group"
-            >
-              <div className="flex items-center gap-3">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400 group-hover:text-white transition-colors duration-150">
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                  <path d="M7 11V7a5 5 0 0110 0v4" />
-                  <line x1="12" y1="16" x2="12" y2="16.01" />
-                </svg>
-                <span className="text-sm text-gray-300 group-hover:text-white transition-colors duration-150">
-                  Lock Now
+            <div>
+              <Row
+                label="Biometric quick unlock"
+                hint={
+                  bioSupported === false
+                    ? 'Not available on this device.'
+                    : 'Unlock with your fingerprint or device biometrics.'
+                }
+                control={
+                  <Toggle
+                    checked={bioEnrolled}
+                    disabled={bioSupported !== true || bioBusy}
+                    onChange={handleBiometricToggle}
+                    label="Biometric quick unlock"
+                  />
+                }
+              />
+              {bioError && !bioModalOpen && (
+                <p className="mt-1.5 text-xs text-danger">{bioError}</p>
+              )}
+            </div>
+
+            <div className="space-y-2 border-t border-border pt-4">
+              <button
+                onClick={() => setShowPasswordChange(true)}
+                className="group flex w-full items-center justify-between rounded-md bg-surface-2 px-3 py-2.5 transition-colors hover:bg-surface-hover"
+              >
+                <span className="flex items-center gap-3 text-sm text-text">
+                  <KeyRound size={16} className="text-text-secondary" />
+                  Change master password
                 </span>
-              </div>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500">
-                <polyline points="9 18 15 12 9 6" />
-              </svg>
-            </button>
-          </div>
+                <ChevronRight size={16} className="text-text-muted" />
+              </button>
+
+              <button
+                onClick={handleLockNow}
+                className="group flex w-full items-center justify-between rounded-md bg-surface-2 px-3 py-2.5 transition-colors hover:bg-surface-hover"
+              >
+                <span className="flex items-center gap-3 text-sm text-text">
+                  <Lock size={16} className="text-text-secondary" />
+                  Lock now
+                </span>
+                <ChevronRight size={16} className="text-text-muted" />
+              </button>
+            </div>
+          </Card>
         </section>
 
-        {/* ── Danger Zone ──────────────────────────────────────────── */}
+        {/* ── Danger zone ──────────────────────────────────────────── */}
         <section>
-          <h2 className="text-sm font-semibold text-red-400 uppercase tracking-wider mb-3">
-            Danger Zone
-          </h2>
-          <div className="p-4 rounded-lg bg-gray-900 border border-red-500/50">
+          <SectionHeader>Danger zone</SectionHeader>
+          <Card className="border-danger/40">
             {clearStep === 'idle' && (
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-medium text-white">Clear All Data</p>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    Permanently delete all accounts and settings
+                  <p className="text-sm font-medium text-text">Clear all data</p>
+                  <p className="mt-0.5 text-xs text-text-muted">
+                    Permanently deletes every 2FA and mail account. This can't be undone.
                   </p>
                 </div>
-                <button
-                  onClick={handleClearAllData}
-                  className="px-3 py-1.5 text-xs font-medium text-white bg-red-600 hover:bg-red-500 rounded-lg transition-colors duration-150"
-                >
-                  Clear All
-                </button>
+                <Button variant="danger" size="sm" onClick={handleClearAllData}>
+                  Clear all
+                </Button>
               </div>
             )}
 
             {clearStep === 'confirm' && (
               <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-400 flex-shrink-0">
-                    <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-                    <line x1="12" y1="9" x2="12" y2="13" />
-                    <line x1="12" y1="17" x2="12.01" y2="17" />
-                  </svg>
-                  <p className="text-sm text-red-300">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle size={16} className="mt-0.5 flex-shrink-0 text-danger" />
+                  <p className="text-sm text-text">
                     Are you sure? This will delete all 2FA accounts and mail accounts.
                   </p>
                 </div>
                 <div className="flex justify-end gap-2">
-                  <button
-                    onClick={cancelClear}
-                    className="px-3 py-1.5 text-xs text-gray-300 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors duration-150"
-                  >
+                  <Button variant="secondary" size="sm" onClick={cancelClear}>
                     Cancel
-                  </button>
-                  <button
-                    onClick={handleClearAllData}
-                    className="px-3 py-1.5 text-xs font-medium text-white bg-red-600 hover:bg-red-500 rounded-lg transition-colors duration-150"
-                  >
-                    Yes, Continue
-                  </button>
+                  </Button>
+                  <Button variant="danger" size="sm" onClick={handleClearAllData}>
+                    Yes, continue
+                  </Button>
                 </div>
               </div>
             )}
 
             {clearStep === 'type-delete' && (
               <div className="space-y-3">
-                <p className="text-sm text-red-300">
-                  Type <span className="font-mono font-bold">DELETE</span> to confirm:
+                <p className="text-sm text-text">
+                  Type <span className="font-mono font-bold text-danger">DELETE</span> to confirm:
                 </p>
-                <input
-                  type="text"
+                <Input
                   value={deleteConfirmText}
                   onChange={(e) => setDeleteConfirmText(e.target.value)}
                   placeholder="Type DELETE"
-                  className="w-full bg-gray-800 border border-red-500/50 text-white rounded-lg px-3 py-2 text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500 transition-colors duration-150"
+                  invalid
                   autoFocus
                 />
                 <div className="flex justify-end gap-2">
-                  <button
-                    onClick={cancelClear}
-                    className="px-3 py-1.5 text-xs text-gray-300 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors duration-150"
-                  >
+                  <Button variant="secondary" size="sm" onClick={cancelClear}>
                     Cancel
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="danger"
+                    size="sm"
                     onClick={handleClearAllData}
                     disabled={deleteConfirmText !== 'DELETE' || clearing}
-                    className="px-3 py-1.5 text-xs font-medium text-white bg-red-600 hover:bg-red-500 disabled:bg-red-600/50 disabled:cursor-not-allowed rounded-lg transition-colors duration-150"
                   >
-                    {clearing ? 'Clearing...' : 'Delete Everything'}
-                  </button>
+                    <Trash2 size={14} />
+                    {clearing ? 'Clearing...' : 'Delete everything'}
+                  </Button>
                 </div>
               </div>
             )}
-          </div>
+          </Card>
         </section>
       </div>
 
       {/* Password Change Modal */}
-      {showPasswordChange && (
-        <PasswordChange onClose={() => setShowPasswordChange(false)} />
+      {showPasswordChange && <PasswordChange onClose={() => setShowPasswordChange(false)} />}
+
+      {/* Biometric enrollment Modal */}
+      {bioModalOpen && (
+        <Modal
+          open
+          onClose={() => {
+            if (bioBusy) return;
+            setBioModalOpen(false);
+            setBioError(null);
+          }}
+          title="Enable biometric unlock"
+          description="Confirm your master password to link biometric unlock on this device."
+          size="sm"
+          footer={
+            <>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setBioModalOpen(false);
+                  setBioError(null);
+                }}
+                disabled={bioBusy}
+              >
+                Cancel
+              </Button>
+              <Button onClick={confirmBiometricEnroll} disabled={bioBusy}>
+                {bioBusy ? 'Enabling...' : 'Enable'}
+              </Button>
+            </>
+          }
+        >
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              confirmBiometricEnroll();
+            }}
+            className="space-y-3"
+          >
+            <div className="flex items-start gap-2 rounded-md bg-accent-soft px-3 py-2 text-accent">
+              <Fingerprint size={15} className="mt-0.5 flex-shrink-0" />
+              <p className="text-xs">
+                Your password stays available as a fallback. You can turn this off anytime.
+              </p>
+            </div>
+            <Field label="Master password" error={bioError ?? undefined}>
+              <Input
+                type="password"
+                value={bioPassword}
+                onChange={(e) => setBioPassword(e.target.value)}
+                placeholder="Enter master password"
+                invalid={!!bioError}
+                autoFocus
+              />
+            </Field>
+          </form>
+        </Modal>
       )}
     </div>
   );

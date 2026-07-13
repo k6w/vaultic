@@ -30,14 +30,76 @@ function enrichAccount(account: Partial<TwoFactorAccount>): Partial<TwoFactorAcc
   };
 }
 
-// Listen for messages from background (manual scan / image scan trigger)
+// Listen for messages from background (manual scan / image scan / autofill)
 browser.runtime.onMessage.addListener((message: any) => {
   if (message.type === 'SCAN_PAGE_QR') {
     handleManualScan();
   } else if (message.type === 'SCAN_IMAGE_QR' && message.srcUrl) {
     handleSingleImageScan(message.srcUrl);
+  } else if (message.type === 'FILL_CODE' && typeof message.code === 'string') {
+    return Promise.resolve(fillOtpCode(message.code));
   }
 });
+
+const OTP_HINT = /(otp|totp|2fa|mfa|one.?time|auth.?code|verif|token|passcode|security.?code|\bcode\b|\bpin\b)/i;
+
+/** Find the most likely one-time-code input on the page. */
+function findOtpInputs(): HTMLInputElement[] {
+  const all = Array.from(document.querySelectorAll<HTMLInputElement>('input'));
+  const visible = all.filter(
+    (el) => el.offsetParent !== null && !el.disabled && !el.readOnly && el.type !== 'hidden'
+  );
+
+  // 1. Explicit autocomplete hint.
+  const byAutocomplete = visible.filter((el) => el.autocomplete === 'one-time-code');
+  if (byAutocomplete.length) return byAutocomplete;
+
+  // 2. Split single-character boxes (6-8 numeric inputs with maxlength 1).
+  const singleChar = visible.filter(
+    (el) => el.maxLength === 1 && (el.inputMode === 'numeric' || el.type === 'tel' || el.type === 'text')
+  );
+  if (singleChar.length >= 4 && singleChar.length <= 8) return singleChar;
+
+  // 3. Name/id/aria/placeholder match on a text-like field.
+  const byHint = visible.filter((el) => {
+    if (!['text', 'tel', 'number', ''].includes(el.type)) return false;
+    const hay = `${el.name} ${el.id} ${el.getAttribute('aria-label') ?? ''} ${el.placeholder ?? ''}`;
+    return OTP_HINT.test(hay);
+  });
+  if (byHint.length) return [byHint[0]];
+
+  // 4. Currently focused input.
+  const active = document.activeElement;
+  if (active instanceof HTMLInputElement && visible.includes(active)) return [active];
+
+  return [];
+}
+
+function setNativeValue(el: HTMLInputElement, value: string) {
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+  setter ? setter.call(el, value) : (el.value = value);
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+function fillOtpCode(code: string): { ok: boolean; error?: string } {
+  const inputs = findOtpInputs();
+  if (inputs.length === 0) return { ok: false, error: 'No code field found on this page' };
+
+  if (inputs.length > 1 && inputs.length === code.length) {
+    // Distribute one digit per box.
+    inputs.forEach((el, i) => {
+      el.focus();
+      setNativeValue(el, code[i]);
+    });
+    inputs[inputs.length - 1].focus();
+  } else {
+    const el = inputs[0];
+    el.focus();
+    setNativeValue(el, code);
+  }
+  return { ok: true };
+}
 
 // Auto-detect QR codes after page load
 async function autoDetect() {

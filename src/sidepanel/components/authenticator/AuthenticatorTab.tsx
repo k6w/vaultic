@@ -1,98 +1,129 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import {
+  Plus,
+  ShieldCheck,
+  FolderCog,
+  ArrowUpDown,
+  Rows3,
+  Rows4,
+  CheckSquare,
+  Trash2,
+  Pin,
+  X,
+} from 'lucide-react';
 import { useVault } from '@hooks/useVault';
 import { useTotp } from '@hooks/useTotp';
 import { useCountdown } from '@hooks/useCountdown';
 import { sendMessage } from '@shared/messages';
-import type { TwoFactorAccount } from '@shared/types';
-import { getFaviconUrl } from '@shared/favicon';
+import { sortAccounts, matchesQuery } from '@shared/accounts';
+import type { TwoFactorAccount, ListDensity } from '@shared/types';
+import { Button, IconButton, EmptyState, Tooltip, cn } from '@shared/ui';
 import SearchBar from '../../../popup/components/SearchBar';
-import CountdownRing from '../../../popup/components/CountdownRing';
+import AccountRow from './AccountRow';
 import AccountForm from './AccountForm';
+import FolderManager from './FolderManager';
+import ReorderModal from './ReorderModal';
+import QrModal from './QrModal';
+import ConfirmDialog from '../ConfirmDialog';
 
-function getIssuerColor(issuer: string): string {
-  const colors = [
-    'bg-blue-600', 'bg-purple-600', 'bg-pink-600', 'bg-red-600',
-    'bg-orange-600', 'bg-amber-600', 'bg-emerald-600', 'bg-teal-600',
-    'bg-cyan-600', 'bg-indigo-600',
-  ];
-  let hash = 0;
-  for (let i = 0; i < issuer.length; i++) {
-    hash = issuer.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return colors[Math.abs(hash) % colors.length];
-}
-
-function formatCode(code: string): string {
-  const mid = Math.floor(code.length / 2);
-  return code.slice(0, mid) + ' ' + code.slice(mid);
-}
-
-function AccountIcon({ account }: { account: TwoFactorAccount }) {
-  const [faviconError, setFaviconError] = useState(false);
-  const faviconUrl = getFaviconUrl(account.issuer, account.icon);
-
-  if (faviconUrl && !faviconError) {
-    return (
-      <img
-        src={faviconUrl}
-        alt=""
-        className="flex-shrink-0 w-9 h-9 rounded-lg bg-gray-800"
-        onError={() => setFaviconError(true)}
-      />
-    );
-  }
-
-  return (
-    <div
-      className={`flex-shrink-0 w-9 h-9 rounded-lg ${getIssuerColor(account.issuer)} flex items-center justify-center`}
-    >
-      <span className="text-white text-xs font-bold">
-        {account.issuer.charAt(0).toUpperCase()}
-      </span>
-    </div>
-  );
-}
+type FolderFilter = 'all' | 'none' | string;
 
 export default function AuthenticatorTab() {
   const { vault, refetch } = useVault();
   const accounts = vault?.accounts ?? [];
+  const folders = useMemo(
+    () => [...(vault?.folders ?? [])].sort((a, b) => a.order - b.order),
+    [vault?.folders]
+  );
+  const density: ListDensity = vault?.settings?.listDensity ?? 'comfortable';
   const codes = useTotp(accounts);
   const remainingSeconds = useCountdown(30);
+
   const [search, setSearch] = useState('');
+  const [folderFilter, setFolderFilter] = useState<FolderFilter>('all');
   const [showForm, setShowForm] = useState(false);
   const [editingAccount, setEditingAccount] = useState<TwoFactorAccount | undefined>();
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [showFolders, setShowFolders] = useState(false);
+  const [showReorder, setShowReorder] = useState(false);
+  const [qrAccount, setQrAccount] = useState<TwoFactorAccount | null>(null);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
 
-  const filteredAccounts = useMemo(() => {
-    if (!search.trim()) return accounts;
-    const query = search.toLowerCase();
-    return accounts.filter(
-      (a) =>
-        a.issuer.toLowerCase().includes(query) ||
-        a.label.toLowerCase().includes(query),
-    );
-  }, [accounts, search]);
+  const visible = useMemo(() => {
+    const byFolder = accounts.filter((a) => {
+      if (folderFilter === 'all') return true;
+      if (folderFilter === 'none') return !a.folderId;
+      return a.folderId === folderFilter;
+    });
+    return sortAccounts(byFolder.filter((a) => matchesQuery(a, search)));
+  }, [accounts, folderFilter, search]);
 
-  const handleCopy = useCallback(async (accountId: string, code: string) => {
-    try {
-      await navigator.clipboard.writeText(code);
-      setCopiedId(accountId);
-      setTimeout(() => setCopiedId(null), 2000);
-    } catch { /* ignore */ }
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const rowHeight = density === 'compact' ? 44 : 62;
+  const virtualizer = useVirtualizer({
+    count: visible.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => rowHeight,
+    overscan: 8,
+  });
+
+  const persist = useCallback(
+    (updater: (a: TwoFactorAccount) => TwoFactorAccount, ids: string[]) => {
+      const updated = accounts.filter((a) => ids.includes(a.id)).map(updater);
+      return sendMessage({ type: 'BULK_UPDATE_ACCOUNTS', accounts: updated }).then(refetch);
+    },
+    [accounts, refetch]
+  );
+
+  const togglePin = useCallback(
+    (a: TwoFactorAccount) =>
+      sendMessage({
+        type: 'UPDATE_ACCOUNT',
+        account: { ...a, pinned: !a.pinned, updatedAt: Date.now() },
+      }).then(refetch),
+    [refetch]
+  );
+
+  const setDensity = (d: ListDensity) =>
+    sendMessage({ type: 'UPDATE_SETTINGS', settings: { listDensity: d } }).then(refetch);
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
   }, []);
 
-  const handleEdit = (account: TwoFactorAccount) => {
-    setEditingAccount(account);
-    setShowForm(true);
+  const exitSelect = () => {
+    setSelectMode(false);
+    setSelected(new Set());
   };
 
-  const handleDelete = async (accountId: string) => {
-    try {
-      await sendMessage({ type: 'DELETE_ACCOUNT', accountId });
-      setDeletingId(null);
-      refetch();
-    } catch { /* ignore */ }
+  const handleDelete = async (id: string) => {
+    await sendMessage({ type: 'DELETE_ACCOUNT', accountId: id });
+    setDeletingId(null);
+    refetch();
+  };
+
+  const bulkDelete = async () => {
+    await sendMessage({ type: 'BULK_DELETE_ACCOUNTS', accountIds: [...selected] });
+    setBulkDeleteOpen(false);
+    exitSelect();
+    refetch();
+  };
+
+  const bulkMove = async (folderId: string | undefined) => {
+    await persist((a) => ({ ...a, folderId, updatedAt: Date.now() }), [...selected]);
+    exitSelect();
+  };
+
+  const bulkPin = async () => {
+    await persist((a) => ({ ...a, pinned: true, updatedAt: Date.now() }), [...selected]);
+    exitSelect();
   };
 
   const handleSave = () => {
@@ -101,26 +132,62 @@ export default function AuthenticatorTab() {
     refetch();
   };
 
-  const handleCloseForm = () => {
-    setShowForm(false);
-    setEditingAccount(undefined);
-  };
+  const chips: { key: FolderFilter; label: string; color?: string }[] = [
+    { key: 'all', label: 'All' },
+    ...folders.map((f) => ({ key: f.id, label: f.name, color: f.color })),
+    ...(accounts.some((a) => !a.folderId) ? [{ key: 'none' as const, label: 'Ungrouped' }] : []),
+  ];
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 pt-4 pb-2">
-        <h1 className="text-base font-semibold text-white">Authenticator</h1>
-        <button
-          onClick={() => { setEditingAccount(undefined); setShowForm(true); }}
-          className="flex items-center gap-1.5 text-xs font-medium text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/15 px-2.5 py-1.5 rounded-md transition-colors duration-150"
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          Add
-        </button>
+      <div className="flex items-center justify-between gap-2 px-4 pt-4 pb-2">
+        <div className="flex items-baseline gap-2">
+          <h1 className="font-display text-base font-semibold text-text">Authenticator</h1>
+          <span className="text-xs text-text-muted">{accounts.length}</span>
+        </div>
+        <div className="flex items-center gap-0.5">
+          <Tooltip label={density === 'compact' ? 'Comfortable' : 'Compact'} side="bottom">
+            <IconButton
+              label="Toggle density"
+              size="sm"
+              onClick={() => setDensity(density === 'compact' ? 'comfortable' : 'compact')}
+            >
+              {density === 'compact' ? <Rows3 size={17} /> : <Rows4 size={17} />}
+            </IconButton>
+          </Tooltip>
+          <Tooltip label="Select" side="bottom">
+            <IconButton
+              label="Select accounts"
+              size="sm"
+              onClick={() => (selectMode ? exitSelect() : setSelectMode(true))}
+              className={selectMode ? 'text-accent' : ''}
+            >
+              <CheckSquare size={17} />
+            </IconButton>
+          </Tooltip>
+          <Tooltip label="Reorder" side="bottom">
+            <IconButton label="Reorder accounts" size="sm" onClick={() => setShowReorder(true)}>
+              <ArrowUpDown size={17} />
+            </IconButton>
+          </Tooltip>
+          <Tooltip label="Folders" side="bottom">
+            <IconButton label="Manage folders" size="sm" onClick={() => setShowFolders(true)}>
+              <FolderCog size={17} />
+            </IconButton>
+          </Tooltip>
+          <Button
+            size="sm"
+            variant="soft"
+            className="ml-1"
+            onClick={() => {
+              setEditingAccount(undefined);
+              setShowForm(true);
+            }}
+          >
+            <Plus size={15} /> Add
+          </Button>
+        </div>
       </div>
 
       {/* Search */}
@@ -128,80 +195,122 @@ export default function AuthenticatorTab() {
         <SearchBar value={search} onChange={setSearch} />
       </div>
 
-      {/* Account list */}
-      <div className="flex-1 overflow-y-auto px-2">
-        {filteredAccounts.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center px-8">
-            <div className="w-12 h-12 rounded-2xl bg-gray-800/80 flex items-center justify-center mb-3">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-gray-600">
-                <path d="M12 2L3 7v5c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z"
-                  stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
-            <p className="text-sm text-gray-400 mb-0.5">
-              {search ? 'No matching accounts' : 'No 2FA accounts yet'}
-            </p>
-            {!search && (
-              <p className="text-xs text-gray-500">Tap "Add" to get started</p>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-0.5">
-            {filteredAccounts.map((account) => {
-              const code = codes.get(account.id) ?? '------';
-              const isCopied = copiedId === account.id;
+      {/* Folder chips */}
+      {chips.length > 1 && (
+        <div className="flex gap-1.5 overflow-x-auto px-4 pb-2 no-scrollbar">
+          {chips.map((c) => (
+            <button
+              key={c.key}
+              onClick={() => setFolderFilter(c.key)}
+              className={cn(
+                'flex flex-shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors',
+                folderFilter === c.key
+                  ? 'bg-accent text-accent-fg'
+                  : 'bg-surface-2 text-text-secondary hover:text-text'
+              )}
+            >
+              {c.color && (
+                <span className="h-2 w-2 rounded-full" style={{ background: c.color }} />
+              )}
+              {c.label}
+            </button>
+          ))}
+        </div>
+      )}
 
+      {/* Bulk action bar */}
+      {selectMode && selected.size > 0 && (
+        <div className="mx-4 mb-2 flex items-center gap-2 rounded-lg border border-border bg-surface-2 px-3 py-2 animate-fade-in">
+          <span className="text-xs font-medium text-text">{selected.size} selected</span>
+          <div className="flex-1" />
+          <Button size="sm" variant="ghost" onClick={bulkPin}>
+            <Pin size={14} /> Pin
+          </Button>
+          <select
+            className="h-8 rounded-md border border-border bg-surface-1 px-2 text-xs text-text focus:outline-none focus:ring-2 focus:ring-accent/40"
+            value=""
+            onChange={(e) => bulkMove(e.target.value || undefined)}
+          >
+            <option value="" disabled>
+              Move to…
+            </option>
+            <option value="">Ungrouped</option>
+            {folders.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.name}
+              </option>
+            ))}
+          </select>
+          <Button size="sm" variant="ghost" onClick={() => setBulkDeleteOpen(true)}>
+            <Trash2 size={14} className="text-danger" />
+          </Button>
+          <IconButton label="Clear selection" size="sm" onClick={exitSelect}>
+            <X size={15} />
+          </IconButton>
+        </div>
+      )}
+
+      {/* List (virtualized) */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-2">
+        {visible.length === 0 ? (
+          <EmptyState
+            className="h-full"
+            icon={<ShieldCheck size={26} />}
+            title={search || folderFilter !== 'all' ? 'No matches' : 'No accounts yet'}
+            description={
+              search || folderFilter !== 'all'
+                ? 'Try a different search or folder.'
+                : 'Add your first 2FA account, or scan a QR code on any page.'
+            }
+            action={
+              !search &&
+              folderFilter === 'all' && (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setEditingAccount(undefined);
+                    setShowForm(true);
+                  }}
+                >
+                  <Plus size={15} /> Add account
+                </Button>
+              )
+            }
+          />
+        ) : (
+          <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
+            {virtualizer.getVirtualItems().map((vi) => {
+              const account = visible[vi.index];
               return (
                 <div
                   key={account.id}
-                  onClick={() => handleCopy(account.id, code)}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-800/50 active:bg-gray-800/70 transition-colors duration-150 group cursor-pointer"
+                  ref={virtualizer.measureElement}
+                  data-index={vi.index}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    transform: `translateY(${vi.start}px)`,
+                  }}
                 >
-                  <AccountIcon account={account} />
-
-                  {/* Account info */}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-white truncate leading-tight">{account.issuer}</p>
-                    {account.label && (
-                      <p className="text-[11px] text-gray-500 truncate leading-tight">{account.label}</p>
-                    )}
-                  </div>
-
-                  {/* TOTP code + countdown */}
-                  <div className="flex items-center gap-1.5 flex-shrink-0">
-                    <span className={`font-mono text-base font-semibold tracking-wider transition-colors duration-300 ${isCopied ? 'text-emerald-400' : 'text-white'}`}>
-                      {formatCode(code)}
-                    </span>
-                    <CountdownRing
-                      remainingSeconds={remainingSeconds}
-                      period={account.period}
-                      size={28}
-                    />
-                  </div>
-
-                  {/* Actions — only show on hover */}
-                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex-shrink-0">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleEdit(account); }}
-                      className="p-1 rounded-md text-gray-500 hover:text-white hover:bg-gray-700 transition-colors duration-150"
-                      title="Edit"
-                    >
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
-                        <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setDeletingId(account.id); }}
-                      className="p-1 rounded-md text-gray-500 hover:text-red-400 hover:bg-gray-700 transition-colors duration-150"
-                      title="Delete"
-                    >
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="3 6 5 6 21 6" />
-                        <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
-                      </svg>
-                    </button>
-                  </div>
+                  <AccountRow
+                    account={account}
+                    code={codes.get(account.id) ?? '------'}
+                    remainingSeconds={remainingSeconds}
+                    density={density}
+                    clearSeconds={vault?.settings?.clipboardClearSeconds ?? 0}
+                    selectMode={selectMode}
+                    selected={selected.has(account.id)}
+                    onToggleSelect={toggleSelect}
+                    onEdit={(a) => {
+                      setEditingAccount(a);
+                      setShowForm(true);
+                    }}
+                    onDelete={setDeletingId}
+                    onTogglePin={togglePin}
+                    onShowQr={setQrAccount}
+                  />
                 </div>
               );
             })}
@@ -209,39 +318,51 @@ export default function AuthenticatorTab() {
         )}
       </div>
 
-      {/* Account Form Modal */}
+      {/* Modals */}
       {showForm && (
         <AccountForm
           account={editingAccount}
+          folders={folders}
           onSave={handleSave}
-          onClose={handleCloseForm}
+          onClose={() => {
+            setShowForm(false);
+            setEditingAccount(undefined);
+          }}
         />
       )}
-
-      {/* Delete Confirmation */}
+      {showFolders && (
+        <FolderManager folders={folders} onChanged={refetch} onClose={() => setShowFolders(false)} />
+      )}
+      {showReorder && (
+        <ReorderModal
+          accounts={accounts}
+          onSaved={() => {
+            setShowReorder(false);
+            refetch();
+          }}
+          onClose={() => setShowReorder(false)}
+        />
+      )}
+      {qrAccount && <QrModal account={qrAccount} onClose={() => setQrAccount(null)} />}
       {deletingId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-gray-900 border border-gray-700 rounded-xl p-5 max-w-xs w-full mx-4 shadow-xl">
-            <h3 className="text-base font-semibold text-white mb-2">Delete Account</h3>
-            <p className="text-sm text-gray-400 mb-5">
-              This action cannot be undone.
-            </p>
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setDeletingId(null)}
-                className="px-3.5 py-1.5 text-sm text-gray-300 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors duration-150"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleDelete(deletingId)}
-                className="px-3.5 py-1.5 text-sm text-white bg-red-600 hover:bg-red-500 rounded-lg transition-colors duration-150"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
+        <ConfirmDialog
+          title="Delete account?"
+          description="This can't be undone. Make sure you can still sign in another way."
+          confirmLabel="Delete"
+          danger
+          onConfirm={() => handleDelete(deletingId)}
+          onClose={() => setDeletingId(null)}
+        />
+      )}
+      {bulkDeleteOpen && (
+        <ConfirmDialog
+          title={`Delete ${selected.size} accounts?`}
+          description="This can't be undone."
+          confirmLabel="Delete all"
+          danger
+          onConfirm={bulkDelete}
+          onClose={() => setBulkDeleteOpen(false)}
+        />
       )}
     </div>
   );

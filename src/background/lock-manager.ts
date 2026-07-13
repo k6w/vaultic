@@ -3,7 +3,12 @@ import {
   readEncryptedVault,
   writeEncryptedVault,
 } from '@shared/storage';
-import { DEFAULT_VAULT, MAX_LOGIN_ATTEMPTS, LOGIN_COOLDOWN_MS } from '@shared/constants';
+import {
+  DEFAULT_VAULT,
+  MAX_LOGIN_ATTEMPTS,
+  LOGIN_COOLDOWN_MS,
+  migrateVault,
+} from '@shared/constants';
 import type { VaultData } from '@shared/types';
 
 // Module-level state
@@ -32,7 +37,7 @@ export async function unlock(
 
   try {
     const decrypted = await decrypt(encryptedVault, password);
-    const data = JSON.parse(decrypted) as VaultData;
+    const data = migrateVault(JSON.parse(decrypted) as VaultData);
 
     // Success: cache password and data
     currentPassword = password;

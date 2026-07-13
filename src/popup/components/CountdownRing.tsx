@@ -2,63 +2,72 @@ interface CountdownRingProps {
   remainingSeconds: number;
   period: number;
   size?: number;
+  showLabel?: boolean;
 }
 
+/**
+ * The signature "time" element: a ring that drains with the code's lifetime and
+ * shifts accent → warning → danger as it nears expiry, with a soft accent glow.
+ */
 export default function CountdownRing({
   remainingSeconds,
   period,
-  size = 36,
+  size = 30,
+  showLabel = true,
 }: CountdownRingProps) {
-  const strokeWidth = 3;
+  const strokeWidth = 2.5;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
-  const progress = remainingSeconds / period;
+  const progress = Math.max(0, Math.min(1, remainingSeconds / period));
   const dashoffset = circumference * (1 - progress);
 
-  // Color based on remaining time
-  let strokeColor = 'stroke-emerald-500';
-  if (remainingSeconds <= 5) {
-    strokeColor = 'stroke-red-500';
-  } else if (remainingSeconds <= 10) {
-    strokeColor = 'stroke-yellow-500';
-  }
+  let color = 'var(--accent)';
+  if (remainingSeconds <= 5) color = 'var(--danger)';
+  else if (remainingSeconds <= 10) color = 'var(--warning)';
+
+  const urgent = remainingSeconds <= 5;
 
   return (
-    <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
+    <div
+      className="relative inline-flex items-center justify-center"
+      style={{ width: size, height: size }}
+    >
       <svg
         width={size}
         height={size}
         viewBox={`0 0 ${size} ${size}`}
-        className="transform -rotate-90"
+        className="-rotate-90"
+        style={{ filter: urgent ? 'none' : `drop-shadow(0 0 3px ${color}55)` }}
       >
-        {/* Background circle */}
         <circle
           cx={size / 2}
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke="currentColor"
+          stroke="var(--border-strong)"
           strokeWidth={strokeWidth}
-          className="text-gray-700"
         />
-        {/* Progress circle */}
         <circle
           cx={size / 2}
           cy={size / 2}
           r={radius}
           fill="none"
+          stroke={color}
           strokeWidth={strokeWidth}
           strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={dashoffset}
-          className={strokeColor}
-          style={{ transition: 'stroke-dashoffset 1s linear' }}
+          style={{ transition: 'stroke-dashoffset 1s linear, stroke 0.4s ease' }}
         />
       </svg>
-      {/* Center text */}
-      <span className="absolute text-[10px] font-mono text-gray-300">
-        {remainingSeconds}
-      </span>
+      {showLabel && (
+        <span
+          className="absolute font-mono text-[10px] font-medium tnum"
+          style={{ color }}
+        >
+          {remainingSeconds}
+        </span>
+      )}
     </div>
   );
 }
