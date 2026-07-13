@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { sendMessage } from '@shared/messages';
+import { useTheme } from '@hooks/useTheme';
+import { Spinner } from '@shared/ui';
 import LockScreen from './components/LockScreen';
 import TOTPList from './components/TOTPList';
 
@@ -7,6 +9,7 @@ type AppState = 'loading' | 'uninitialized' | 'locked' | 'unlocked';
 
 export default function App() {
   const [state, setState] = useState<AppState>('loading');
+  useTheme();
 
   useEffect(() => {
     async function checkStatus() {
@@ -32,10 +35,10 @@ export default function App() {
   }, []);
 
   return (
-    <div className="dark w-[400px] h-[550px] bg-gray-950 text-white overflow-hidden">
+    <div className="w-[400px] h-[550px] bg-bg text-text overflow-hidden">
       {state === 'loading' && (
         <div className="flex items-center justify-center h-full">
-          <div className="w-6 h-6 border-2 border-gray-600 border-t-emerald-500 rounded-full animate-spin" />
+          <Spinner size={24} />
         </div>
       )}
 

@@ -9,7 +9,9 @@
     "menus",
     "activeTab",
     "scripting",
-    "notifications"
+    "notifications",
+    "clipboardRead",
+    "clipboardWrite"
   ],
   "action": {
     "default_popup": "popup/index.html",

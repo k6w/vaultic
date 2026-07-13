@@ -36,14 +36,14 @@ function getToastStyles(): string {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }
     .toast {
-      background: #111827;
-      border: 1px solid #374151;
-      border-radius: 12px;
+      background: #151a23;
+      border: 1px solid #262e3b;
+      border-radius: 18px;
       padding: 16px;
-      color: #f9fafb;
+      color: #eaeef5;
       width: 320px;
-      box-shadow: 0 20px 25px -5px rgba(0,0,0,0.4);
-      animation: slideIn 0.3s ease-out;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.4);
+      animation: slideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
       display: flex;
       flex-direction: column;
       gap: 12px;
@@ -54,10 +54,10 @@ function getToastStyles(): string {
       gap: 10px;
     }
     .toast-icon {
-      width: 32px;
-      height: 32px;
-      background: #059669;
-      border-radius: 8px;
+      width: 34px;
+      height: 34px;
+      background: #34e0a1;
+      border-radius: 10px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -67,7 +67,7 @@ function getToastStyles(): string {
     .toast-icon svg {
       width: 18px;
       height: 18px;
-      fill: white;
+      fill: #04140e;
     }
     .toast-icon img {
       width: 100%;
@@ -77,16 +77,16 @@ function getToastStyles(): string {
     .toast-title {
       font-size: 14px;
       font-weight: 600;
-      color: #f9fafb;
+      color: #eaeef5;
     }
     .toast-subtitle {
       font-size: 12px;
-      color: #9ca3af;
+      color: #9ba6b4;
       margin-top: 2px;
     }
     .toast-body {
       font-size: 13px;
-      color: #d1d5db;
+      color: #c3ccd8;
     }
     .toast-actions {
       display: flex;
@@ -94,37 +94,37 @@ function getToastStyles(): string {
       justify-content: flex-end;
     }
     .btn {
-      padding: 6px 16px;
-      border-radius: 8px;
+      padding: 7px 16px;
+      border-radius: 10px;
       font-size: 13px;
       font-weight: 500;
       cursor: pointer;
       border: none;
-      transition: background 0.15s;
+      transition: background 0.15s, filter 0.15s;
     }
     .btn-save {
-      background: #059669;
-      color: white;
+      background: #34e0a1;
+      color: #04140e;
     }
     .btn-save:hover {
-      background: #047857;
+      filter: brightness(1.08);
     }
     .btn-dismiss {
-      background: #374151;
-      color: #d1d5db;
+      background: #1c232f;
+      color: #c3ccd8;
     }
     .btn-dismiss:hover {
-      background: #4b5563;
+      background: #202836;
     }
     .toast-info {
-      background: #1f2937;
-      border-radius: 8px;
+      background: #1c232f;
+      border-radius: 10px;
       padding: 8px 12px;
       font-size: 12px;
-      color: #9ca3af;
+      color: #9ba6b4;
     }
     .toast-info strong {
-      color: #e5e7eb;
+      color: #eaeef5;
     }
     @keyframes slideIn {
       from { transform: translateX(100%); opacity: 0; }
@@ -155,7 +155,7 @@ export function showToast(account: Partial<TwoFactorAccount>, domain?: string): 
           ${account.icon ? `<img src="${account.icon}" alt="" />` : shieldSvg}
         </div>
         <div>
-          <div class="toast-title">2FA Code Detected</div>
+          <div class="toast-title">2FA code detected</div>
           <div class="toast-subtitle">${subtitleText}</div>
         </div>
       </div>
@@ -164,7 +164,7 @@ export function showToast(account: Partial<TwoFactorAccount>, domain?: string): 
       </div>
       <div class="toast-actions">
         <button class="btn btn-dismiss" data-action="dismiss">Dismiss</button>
-        <button class="btn btn-save" data-action="save">Save to Vault</button>
+        <button class="btn btn-save" data-action="save">Save to vault</button>
       </div>
     `;
 
@@ -212,11 +212,11 @@ export function showNoQRToast(): void {
   toast.className = 'toast';
   toast.innerHTML = `
     <div class="toast-header">
-      <div class="toast-icon" style="background: #6b7280;">
-        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" fill="white"/></svg>
+      <div class="toast-icon" style="background: #333d4d;">
+        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" fill="#eaeef5"/></svg>
       </div>
       <div>
-        <div class="toast-title">No QR Codes Found</div>
+        <div class="toast-title">No QR codes found</div>
         <div class="toast-subtitle">No 2FA QR codes detected on this page</div>
       </div>
     </div>

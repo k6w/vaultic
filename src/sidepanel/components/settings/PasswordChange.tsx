@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { Eye, EyeOff, CheckCircle2 } from 'lucide-react';
 import { sendMessage } from '@shared/messages';
+import { Modal, Button, Field, Input, IconButton } from '@shared/ui';
 
 interface PasswordChangeProps {
   onClose: () => void;
@@ -61,138 +63,102 @@ export default function PasswordChange({ onClose }: PasswordChangeProps) {
     }
   };
 
-  const EyeButton = ({
-    show,
-    onToggle,
-  }: {
-    show: boolean;
-    onToggle: () => void;
-  }) => (
-    <button
+  const RevealButton = ({ show, onToggle }: { show: boolean; onToggle: () => void }) => (
+    <IconButton
       type="button"
+      label={show ? 'Hide password' : 'Show password'}
+      size="sm"
       onClick={onToggle}
-      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors duration-150"
+      className="absolute right-1 top-1/2 -translate-y-1/2"
     >
-      {show ? (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24" />
-          <line x1="1" y1="1" x2="23" y2="23" />
-        </svg>
-      ) : (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-          <circle cx="12" cy="12" r="3" />
-        </svg>
-      )}
-    </button>
+      {show ? <EyeOff size={16} /> : <Eye size={16} />}
+    </IconButton>
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 max-w-sm w-full mx-4 shadow-xl">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-lg font-semibold text-white">Change Password</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-300 transition-colors duration-150"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
+    <Modal
+      open
+      onClose={onClose}
+      title="Change master password"
+      description="You'll be signed out and asked to unlock with your new password."
+      size="sm"
+      footer={
+        success ? undefined : (
+          <>
+            <Button type="button" variant="secondary" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" form="password-change-form" disabled={saving}>
+              {saving ? 'Changing...' : 'Change password'}
+            </Button>
+          </>
+        )
+      }
+    >
+      {success ? (
+        <div className="flex flex-col items-center py-4 text-center">
+          <CheckCircle2 size={44} className="mb-3 text-accent" />
+          <p className="text-sm font-medium text-text">Password changed successfully</p>
+          <p className="mt-1 text-xs text-text-secondary">Locking vault...</p>
         </div>
-
-        {success ? (
-          <div className="text-center py-4">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-400 mx-auto mb-3">
-              <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
-              <polyline points="22 4 12 14.01 9 11.01" />
-            </svg>
-            <p className="text-sm text-emerald-300">Password changed successfully</p>
-            <p className="text-xs text-gray-400 mt-1">Locking vault...</p>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Current password */}
-            <div>
-              <label className="block text-sm text-gray-400 mb-1.5">Current Password</label>
-              <div className="relative">
-                <input
-                  type={showCurrent ? 'text' : 'password'}
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 pr-10 text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-colors duration-150"
-                  placeholder="Enter current password"
-                />
-                <EyeButton show={showCurrent} onToggle={() => setShowCurrent(!showCurrent)} />
-              </div>
+      ) : (
+        <form id="password-change-form" onSubmit={handleSubmit} className="space-y-4">
+          <Field label="Current password">
+            <div className="relative">
+              <Input
+                type={showCurrent ? 'text' : 'password'}
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                className="pr-11"
+                placeholder="Enter current password"
+              />
+              <RevealButton show={showCurrent} onToggle={() => setShowCurrent(!showCurrent)} />
             </div>
+          </Field>
 
-            {/* New password */}
-            <div>
-              <label className="block text-sm text-gray-400 mb-1.5">New Password</label>
-              <div className="relative">
-                <input
-                  type={showNew ? 'text' : 'password'}
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 pr-10 text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-colors duration-150"
-                  placeholder="Min. 8 characters"
-                />
-                <EyeButton show={showNew} onToggle={() => setShowNew(!showNew)} />
-              </div>
-              {newPassword && newPassword.length < 8 && (
-                <p className="text-xs text-amber-400 mt-1">
-                  {8 - newPassword.length} more character{8 - newPassword.length !== 1 ? 's' : ''} needed
-                </p>
-              )}
+          <Field
+            label="New password"
+            hint={
+              newPassword && newPassword.length < 8
+                ? `${8 - newPassword.length} more character${8 - newPassword.length !== 1 ? 's' : ''} needed`
+                : undefined
+            }
+          >
+            <div className="relative">
+              <Input
+                type={showNew ? 'text' : 'password'}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="pr-11"
+                placeholder="Min. 8 characters"
+              />
+              <RevealButton show={showNew} onToggle={() => setShowNew(!showNew)} />
             </div>
+          </Field>
 
-            {/* Confirm new password */}
-            <div>
-              <label className="block text-sm text-gray-400 mb-1.5">Confirm New Password</label>
-              <div className="relative">
-                <input
-                  type={showConfirm ? 'text' : 'password'}
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 pr-10 text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-colors duration-150"
-                  placeholder="Re-enter new password"
-                />
-                <EyeButton show={showConfirm} onToggle={() => setShowConfirm(!showConfirm)} />
-              </div>
-              {confirmPassword && newPassword !== confirmPassword && (
-                <p className="text-xs text-red-400 mt-1">Passwords do not match</p>
-              )}
+          <Field
+            label="Confirm new password"
+            error={
+              confirmPassword && newPassword !== confirmPassword
+                ? 'Passwords do not match'
+                : undefined
+            }
+          >
+            <div className="relative">
+              <Input
+                type={showConfirm ? 'text' : 'password'}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="pr-11"
+                placeholder="Re-enter new password"
+              />
+              <RevealButton show={showConfirm} onToggle={() => setShowConfirm(!showConfirm)} />
             </div>
+          </Field>
 
-            {/* Error */}
-            {error && (
-              <p className="text-red-400 text-xs">{error}</p>
-            )}
-
-            {/* Buttons */}
-            <div className="flex justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 text-sm text-gray-300 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors duration-150"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={saving}
-                className="px-4 py-2 text-sm text-white bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-600/50 disabled:cursor-not-allowed rounded-lg transition-colors duration-150"
-              >
-                {saving ? 'Changing...' : 'Change Password'}
-              </button>
-            </div>
-          </form>
-        )}
-      </div>
-    </div>
+          {error && <p className="text-xs text-danger">{error}</p>}
+        </form>
+      )}
+    </Modal>
   );
 }

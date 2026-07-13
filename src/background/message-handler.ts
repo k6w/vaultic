@@ -122,6 +122,79 @@ export async function handleMessage(
       return { success: true };
     }
 
+    case 'REORDER_ACCOUNTS': {
+      if (isLocked()) {
+        return { error: 'Vault is locked' };
+      }
+      const vault = getVault()!;
+      const orderMap = new Map(message.orderedIds.map((id, i) => [id, i]));
+      const reordered = vault.accounts.map((a) => ({
+        ...a,
+        sortOrder: orderMap.has(a.id) ? orderMap.get(a.id)! : a.sortOrder,
+      }));
+      await saveVault({ ...vault, accounts: reordered });
+      return { success: true };
+    }
+
+    case 'BULK_UPDATE_ACCOUNTS': {
+      if (isLocked()) {
+        return { error: 'Vault is locked' };
+      }
+      const vault = getVault()!;
+      const byId = new Map(message.accounts.map((a) => [a.id, a]));
+      const updated = vault.accounts.map((a) => byId.get(a.id) ?? a);
+      await saveVault({ ...vault, accounts: updated });
+      return { success: true };
+    }
+
+    case 'BULK_DELETE_ACCOUNTS': {
+      if (isLocked()) {
+        return { error: 'Vault is locked' };
+      }
+      const vault = getVault()!;
+      const remove = new Set(message.accountIds);
+      await saveVault({
+        ...vault,
+        accounts: vault.accounts.filter((a) => !remove.has(a.id)),
+      });
+      return { success: true };
+    }
+
+    case 'ADD_FOLDER': {
+      if (isLocked()) {
+        return { error: 'Vault is locked' };
+      }
+      const vault = getVault()!;
+      await saveVault({ ...vault, folders: [...vault.folders, message.folder] });
+      return { success: true };
+    }
+
+    case 'UPDATE_FOLDER': {
+      if (isLocked()) {
+        return { error: 'Vault is locked' };
+      }
+      const vault = getVault()!;
+      const folders = vault.folders.map((f) =>
+        f.id === message.folder.id ? message.folder : f,
+      );
+      await saveVault({ ...vault, folders });
+      return { success: true };
+    }
+
+    case 'DELETE_FOLDER': {
+      if (isLocked()) {
+        return { error: 'Vault is locked' };
+      }
+      const vault = getVault()!;
+      // Remove the folder and unassign any accounts that referenced it.
+      const folders = vault.folders.filter((f) => f.id !== message.folderId);
+      const accounts = vault.accounts.map((a) =>
+        a.folderId === message.folderId ? { ...a, folderId: undefined } : a,
+      );
+      await saveVault({ ...vault, folders, accounts });
+      return { success: true };
+    }
+
     case 'GENERATE_TOTP': {
       if (isLocked()) {
         return { error: 'Vault is locked' };
@@ -301,6 +374,17 @@ export async function handleMessage(
         return { success: true };
       } catch {
         return { error: 'Current password is incorrect' };
+      }
+    }
+
+    case 'VERIFY_PASSWORD': {
+      try {
+        const encryptedVault = await readEncryptedVault();
+        if (!encryptedVault) return { valid: false };
+        await decrypt(encryptedVault, message.password);
+        return { valid: true };
+      } catch {
+        return { valid: false };
       }
     }
 

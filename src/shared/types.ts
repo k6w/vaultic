@@ -7,8 +7,23 @@ export interface TwoFactorAccount {
   digits: 6 | 8;
   period: number;
   icon?: string;
+  /** Organization. */
+  folderId?: string;
+  tags?: string[];
+  pinned?: boolean;
+  /** Manual ordering weight (ascending). */
+  sortOrder?: number;
+  /** Freeform secure note (e.g. recovery codes). */
+  note?: string;
   createdAt: number;
   updatedAt: number;
+}
+
+export interface Folder {
+  id: string;
+  name: string;
+  color?: string;
+  order: number;
 }
 
 export interface MailAccount {
@@ -66,14 +81,23 @@ export interface MailAttachment {
 export interface VaultData {
   accounts: TwoFactorAccount[];
   mailAccounts: MailAccount[];
+  folders: Folder[];
   settings: UserSettings;
 }
+
+export type ThemePreference = 'light' | 'dark' | 'system';
+export type ListDensity = 'comfortable' | 'compact';
 
 export interface UserSettings {
   autoDetectQR: boolean;
   notifyNewMail: boolean;
   autoLockMinutes: number;
-  theme: 'dark';
+  theme: ThemePreference;
+  /** Seconds after a copy before the clipboard is cleared. 0 disables. */
+  clipboardClearSeconds: number;
+  /** Whether biometric/passkey quick-unlock is enabled. */
+  biometricUnlock: boolean;
+  listDensity: ListDensity;
 }
 
 export interface EncryptedVault {
@@ -94,6 +118,12 @@ export type BackgroundMessage =
   | { type: 'ADD_ACCOUNT'; account: TwoFactorAccount }
   | { type: 'UPDATE_ACCOUNT'; account: TwoFactorAccount }
   | { type: 'DELETE_ACCOUNT'; accountId: string }
+  | { type: 'REORDER_ACCOUNTS'; orderedIds: string[] }
+  | { type: 'BULK_UPDATE_ACCOUNTS'; accounts: TwoFactorAccount[] }
+  | { type: 'BULK_DELETE_ACCOUNTS'; accountIds: string[] }
+  | { type: 'ADD_FOLDER'; folder: Folder }
+  | { type: 'UPDATE_FOLDER'; folder: Folder }
+  | { type: 'DELETE_FOLDER'; folderId: string }
   | { type: 'GENERATE_TOTP'; accountId: string }
   | { type: 'MAIL_GET_DOMAINS' }
   | { type: 'MAIL_CREATE_ACCOUNT'; address: string; password: string }
@@ -106,6 +136,7 @@ export type BackgroundMessage =
   | { type: 'GET_SETTINGS' }
   | { type: 'UPDATE_SETTINGS'; settings: Partial<UserSettings> }
   | { type: 'CHANGE_PASSWORD'; currentPassword: string; newPassword: string }
+  | { type: 'VERIFY_PASSWORD'; password: string }
   | { type: 'CLEAR_ALL_DATA' }
   | { type: 'EXPORT_VAULT' }
   | { type: 'IMPORT_ACCOUNTS'; accounts: TwoFactorAccount[] };
@@ -114,4 +145,5 @@ export type BackgroundMessage =
 export type ContentMessage =
   | { type: 'SCAN_PAGE_QR' }
   | { type: 'SCAN_IMAGE_QR'; srcUrl: string }
-  | { type: 'QR_SCAN_RESULT'; accounts: Partial<TwoFactorAccount>[] };
+  | { type: 'QR_SCAN_RESULT'; accounts: Partial<TwoFactorAccount>[] }
+  | { type: 'FILL_CODE'; code: string };
