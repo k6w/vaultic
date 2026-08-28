@@ -3,8 +3,6 @@ import { rmSync, mkdirSync, cpSync, existsSync } from 'fs';
 import { resolve, join } from 'path';
 
 const ROOT = resolve(__dirname, '..');
-const DIST = join(ROOT, 'dist');
-
 // Parse --target arg (default: chrome)
 const args = process.argv.slice(2);
 const targetArg = args.find((a) => a.startsWith('--target='));
@@ -14,6 +12,9 @@ if (target !== 'chrome' && target !== 'firefox') {
   console.error(`Unknown target: ${target}. Use "chrome" or "firefox".`);
   process.exit(1);
 }
+
+const DIST = join(ROOT, 'dist', target);
+process.env.VAULTIC_DIST_DIR = DIST;
 
 function run(cmd: string) {
   console.log(`\n> ${cmd}`);

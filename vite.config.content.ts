@@ -1,6 +1,8 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
 
+const distDir = process.env.VAULTIC_DIST_DIR ?? resolve(__dirname, 'dist', 'chrome');
+
 export default defineConfig({
   resolve: {
     alias: {
@@ -9,7 +11,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: 'dist/content',
+    outDir: resolve(distDir, 'content'),
     emptyOutDir: false,
     copyPublicDir: false,
     lib: {

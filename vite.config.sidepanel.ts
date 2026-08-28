@@ -3,6 +3,8 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { resolve } from 'path';
 
+const distDir = process.env.VAULTIC_DIST_DIR ?? resolve(__dirname, 'dist', 'chrome');
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   root: resolve(__dirname, 'src/sidepanel'),
@@ -14,7 +16,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: resolve(__dirname, 'dist/sidepanel'),
+    outDir: resolve(distDir, 'sidepanel'),
     emptyOutDir: false,
   },
 });

@@ -2,7 +2,7 @@ import jsQR from 'jsqr';
 import { parseOTPAuthURI } from '../shared/totp';
 import type { TwoFactorAccount } from '../shared/types';
 
-const scannedImages = new WeakSet<HTMLElement>();
+const scannedImages = new WeakSet<Element>();
 
 export function scanPageForQR(manual = false): Partial<TwoFactorAccount>[] {
   const results: Partial<TwoFactorAccount>[] = [];
@@ -159,9 +159,9 @@ function scanSVG(svg: SVGElement): Partial<TwoFactorAccount> | null {
 }
 
 function scanSVGDataUri(
-  dataUri: string,
-  width: number,
-  height: number,
+  _dataUri: string,
+  _width: number,
+  _height: number,
 ): Partial<TwoFactorAccount> | null {
   // SVG scanning requires async image load - handled in async scanner
   // For sync path, skip SVGs (they'll be caught by async path)
