@@ -1,13 +1,15 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
+import { fileURLToPath } from 'url';
 
-const distDir = process.env.VAULTIC_DIST_DIR ?? resolve(__dirname, 'dist', 'chrome');
+const rootDir = fileURLToPath(new URL('.', import.meta.url));
+const distDir = process.env.VAULTIC_DIST_DIR ?? resolve(rootDir, 'dist', 'chrome');
 
 export default defineConfig({
   resolve: {
     alias: {
-      '@shared': resolve(__dirname, 'src/shared'),
-      '@hooks': resolve(__dirname, 'src/hooks'),
+      '@shared': resolve(rootDir, 'src/shared'),
+      '@hooks': resolve(rootDir, 'src/hooks'),
     },
   },
   build: {
@@ -15,7 +17,7 @@ export default defineConfig({
     emptyOutDir: false,
     copyPublicDir: false,
     lib: {
-      entry: resolve(__dirname, 'src/background/index.ts'),
+      entry: resolve(rootDir, 'src/background/index.ts'),
       formats: ['iife'],
       name: 'background',
       fileName: () => 'index.js',

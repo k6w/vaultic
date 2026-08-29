@@ -2,17 +2,19 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { resolve } from 'path';
+import { fileURLToPath } from 'url';
 
-const distDir = process.env.VAULTIC_DIST_DIR ?? resolve(__dirname, 'dist', 'chrome');
+const rootDir = fileURLToPath(new URL('.', import.meta.url));
+const distDir = process.env.VAULTIC_DIST_DIR ?? resolve(rootDir, 'dist', 'chrome');
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  root: resolve(__dirname, 'src/popup'),
+  root: resolve(rootDir, 'src/popup'),
   base: './',
   resolve: {
     alias: {
-      '@shared': resolve(__dirname, 'src/shared'),
-      '@hooks': resolve(__dirname, 'src/hooks'),
+      '@shared': resolve(rootDir, 'src/shared'),
+      '@hooks': resolve(rootDir, 'src/hooks'),
     },
   },
   build: {

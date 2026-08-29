@@ -1,6 +1,6 @@
 # Vaultic
 
-A browser extension that combines a TOTP two-factor authentication manager with disposable temporary email, all secured behind an encrypted vault.
+A local-first browser security utility that combines a TOTP authenticator with private temporary email behind one encrypted vault.
 
 Built for Chrome and Firefox.
 
@@ -13,13 +13,17 @@ Built for Chrome and Firefox.
 - Manual entry — paste a secret key like `I65VU7K5ZQL7WB4E` or a full `otpauth://` URI
 - Service favicons resolved automatically via issuer name
 - Click-to-copy codes from popup or side panel
+- Exact-site suggestions and user-triggered OTP filling
+- Per-site browser access: no install-time access to every page
+- Folders, tags, pinned accounts, bulk actions, secure notes, and custom TOTP periods
 - Import/export as JSON or `otpauth://` URIs (Google Authenticator compatible)
+- Versioned encrypted backups with conflict review
 
 ### Temporary Email
 - Create disposable email addresses via [mail.tm](https://mail.tm)
-- Inbox with auto-refresh (30s polling)
-- Full message viewer with HTML rendering (sandboxed iframe)
-- Attachment support
+- Inbox refresh, background unread counts, and optional notifications while unlocked
+- Sanitized HTML viewer with remote tracking images blocked by default
+- Authenticated attachment downloads with a 10 MB safety limit
 - Account credentials stored in vault and included in exports
 
 ### Security
@@ -27,8 +31,10 @@ Built for Chrome and Firefox.
 - Master password required to unlock
 - Auto-lock after configurable idle timeout
 - Brute-force protection with exponential cooldown
+- Unlock cooldown survives service-worker restarts
 - All vault operations run through the background service worker
 - Content script UI isolated via closed Shadow DOM
+- Explicit CSP, validated privileged messages, and serialized encrypted writes
 
 ## Architecture
 
@@ -47,7 +53,7 @@ Four separate Vite builds (popup, sidepanel, background, content) orchestrated b
 
 ## Tech Stack
 
-- **UI**: React 18, TypeScript, Tailwind CSS v4
+- **UI**: React 19, TypeScript, Tailwind CSS v4
 - **Build**: Vite 7, multi-config with `tsx` orchestrator
 - **Crypto**: Web Crypto API (`crypto.subtle`) — AES-256-GCM + PBKDF2
 - **TOTP**: `otpauth` library
@@ -72,6 +78,10 @@ npm run build
 
 # Firefox
 npm run build:firefox
+
+# Type and unit checks
+npm run typecheck
+npm test
 ```
 
 ### Load in Browser
@@ -79,12 +89,24 @@ npm run build:firefox
 **Chrome:**
 1. Go to `chrome://extensions`
 2. Enable "Developer mode"
-3. Click "Load unpacked" and select the `dist/` folder
+3. Click "Load unpacked" and select the `dist/chrome/` folder
 
 **Firefox:**
 1. Go to `about:debugging#/runtime/this-firefox`
 2. Click "Load Temporary Add-on"
-3. Select `dist/manifest.json`
+3. Select `dist/firefox/manifest.json`
+
+## Privacy and permissions
+
+Vaultic stores vault contents only in encrypted extension storage. It has no analytics, account system, or cloud sync. Temporary-mail traffic goes directly to mail.tm.
+
+Manual scan and fill actions use the browser's temporary `activeTab` permission. Persistent QR detection is disabled until you grant access to an individual HTTPS site in Settings; granted access can be revoked there at any time. Vaultic never fills or submits a code without a user action.
+
+Mail notifications pause while the vault is locked because credentials remain encrypted. Remote images in email are blocked by default to reduce tracking.
+
+## Backup and recovery
+
+The master password cannot be recovered. Create a versioned encrypted backup from Data after adding accounts and keep its password separately. Plain JSON and `otpauth://` exports expose secrets and should be used only for deliberate migration.
 
 ## CI/CD
 

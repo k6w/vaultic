@@ -22,23 +22,29 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
       - name: Build for Chrome
         run: npm run build
 
       - name: Package Chrome extension
         run: |
-          cd dist
+          cd dist/chrome
           zip -r ../vaultic-chrome.zip .
-          cd ..
+          mv ../vaultic-chrome.zip ../../vaultic-chrome.zip
 
       - name: Build for Firefox
         run: npm run build:firefox
 
       - name: Package Firefox extension
         run: |
-          cd dist
+          cd dist/firefox
           zip -r ../vaultic-firefox.zip .
-          cd ..
+          mv ../vaultic-firefox.zip ../../vaultic-firefox.zip
 
       - name: Upload Chrome artifact
         uses: actions/upload-artifact@v4

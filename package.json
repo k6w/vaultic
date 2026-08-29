@@ -1,17 +1,18 @@
 {
   "name": "vaultic",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "TOTP 2FA authenticator with temporary email — encrypted, cross-browser",
   "main": "index.js",
   "directories": {
     "doc": "docs"
   },
   "scripts": {
-    "build": "tsx scripts/build.ts",
-    "build:firefox": "tsx scripts/build.ts --target=firefox",
+    "build": "node scripts/build.mjs",
+    "build:firefox": "node scripts/build.mjs --target=firefox",
     "build:all": "npm run build && npm run build:firefox",
     "typecheck": "tsc --noEmit",
-    "test": "npm run typecheck"
+    "test": "vitest run --configLoader runner",
+    "test:watch": "vitest --configLoader runner"
   },
   "keywords": [],
   "author": "",
@@ -42,8 +43,8 @@
     "@vitejs/plugin-react": "^5.1.4",
     "playwright": "^1.61.1",
     "tailwindcss": "^4.2.1",
-    "tsx": "^4.21.0",
     "typescript": "^5.9.3",
-    "vite": "^7.3.1"
+    "vite": "^7.3.1",
+    "vitest": "^4.1.11"
   }
 }
