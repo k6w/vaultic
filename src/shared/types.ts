@@ -35,6 +35,8 @@ export interface MailAccount {
   password: string;
   token?: string;
   label?: string;
+  lastSeenMessageId?: string;
+  unreadCount?: number;
   createdAt: number;
 }
 
@@ -143,6 +145,8 @@ export type BackgroundMessage =
   | { type: 'MAIL_GET_MESSAGES'; accountId: string; page?: number }
   | { type: 'MAIL_GET_MESSAGE'; accountId: string; messageId: string }
   | { type: 'MAIL_DELETE_MESSAGE'; accountId: string; messageId: string }
+  | { type: 'MAIL_MARK_SEEN'; accountId: string; messageId?: string }
+  | { type: 'MAIL_DOWNLOAD_ATTACHMENT'; accountId: string; messageId: string; attachmentId: string }
   | { type: 'SCAN_PAGE_QR'; tabId: number }
   | { type: 'QR_DETECTED'; account: Partial<TwoFactorAccount> }
   | { type: 'GET_SETTINGS' }

@@ -170,6 +170,20 @@ export class MailTmClient {
     });
   }
 
+  static async downloadAttachment(token: string, downloadUrl: string): Promise<ArrayBuffer> {
+    const url = new URL(downloadUrl, MAIL_API_BASE);
+    if (url.origin !== new URL(MAIL_API_BASE).origin) {
+      throw new Error('Unsafe attachment URL');
+    }
+    const response = await fetch(url.href, { headers: authHeaders(token) });
+    if (!response.ok) throw new Error(`Attachment download failed (${response.status})`);
+    const length = Number(response.headers.get('content-length') ?? 0);
+    if (length > 10 * 1024 * 1024) throw new Error('Attachment exceeds the 10 MB safety limit');
+    const data = await response.arrayBuffer();
+    if (data.byteLength > 10 * 1024 * 1024) throw new Error('Attachment exceeds the 10 MB safety limit');
+    return data;
+  }
+
   static async getMe(
     token: string,
   ): Promise<{ id: string; address: string; quota: number; used: number }> {

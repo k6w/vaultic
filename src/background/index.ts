@@ -4,6 +4,7 @@ import { setupContextMenu, handleContextMenuClick } from './context-menu';
 import { handleAutoLock } from './lock-manager';
 import type { BackgroundMessage } from '@shared/types';
 import { syncPageIntegration, watchPageIntegrationPermissions } from './page-integration';
+import { pollMail, setupMailPolling } from './mail-poller';
 
 /**
  * Initialization function shared between onInstalled and onStartup.
@@ -14,6 +15,7 @@ function initialize() {
   chrome.alarms.clear('totpRefresh');
   chrome.action.setBadgeText({ text: '' });
   void syncPageIntegration();
+  setupMailPolling();
 }
 
 // Extension installed or updated
@@ -40,6 +42,8 @@ browser.runtime.onMessage.addListener(
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === 'autoLock') {
     handleAutoLock();
+  } else if (alarm.name === 'mailPoll') {
+    void pollMail();
   }
 });
 

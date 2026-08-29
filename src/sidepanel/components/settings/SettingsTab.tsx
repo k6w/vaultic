@@ -390,6 +390,17 @@ export default function SettingsTab() {
               }
             />
             <Row
+              label="Block remote email images"
+              hint="Prevents senders from learning when you open a message."
+              control={
+                <Toggle
+                  checked={settings.blockRemoteMailContent}
+                  onChange={(v) => updateSetting('blockRemoteMailContent', v)}
+                  label="Block remote email images"
+                />
+              }
+            />
+            <Row
               label="Auto-lock timeout"
               hint="Lock the vault after inactivity."
               control={

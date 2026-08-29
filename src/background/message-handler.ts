@@ -43,6 +43,15 @@ async function ensureMailToken(mailAccount: MailAccount): Promise<string> {
   return token;
 }
 
+function bufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+  }
+  return btoa(binary);
+}
+
 const CONTENT_SCRIPT_MESSAGES = new Set<BackgroundMessage['type']>([
   'GET_SETTINGS',
   'QR_DETECTED',
@@ -55,6 +64,7 @@ const MUTATING_MESSAGES = new Set<BackgroundMessage['type']>([
   'MAIL_DELETE_MESSAGE', 'UPDATE_SETTINGS', 'CHANGE_PASSWORD', 'CLEAR_ALL_DATA',
   'IMPORT_ACCOUNTS', 'QR_DETECTED',
   'IMPORT_BACKUP_DATA',
+  'MAIL_MARK_SEEN',
 ]);
 
 let mutationQueue: Promise<unknown> = Promise.resolve();
@@ -363,6 +373,44 @@ async function handleMessageInternal(
         await MailTmClient.deleteMessage(token, message.messageId);
 
         return { success: true };
+      } catch (error) {
+        return { error: (error as Error).message };
+      }
+    }
+
+    case 'MAIL_MARK_SEEN': {
+      if (isLocked()) return { error: 'Vault is locked' };
+      const vault = getVault()!;
+      const current = vault.mailAccounts.find((account) => account.id === message.accountId);
+      if (current?.lastSeenMessageId === message.messageId && !current?.unreadCount) {
+        return { success: true };
+      }
+      const mailAccounts = vault.mailAccounts.map((account) =>
+        account.id === message.accountId
+          ? { ...account, lastSeenMessageId: message.messageId, unreadCount: 0 }
+          : account,
+      );
+      await saveVault({ ...vault, mailAccounts });
+      const unread = mailAccounts.reduce((total, account) => total + (account.unreadCount ?? 0), 0);
+      await chrome.action.setBadgeText({ text: unread ? String(Math.min(unread, 99)) : '' });
+      return { success: true };
+    }
+
+    case 'MAIL_DOWNLOAD_ATTACHMENT': {
+      if (isLocked()) return { error: 'Vault is locked' };
+      try {
+        const account = getVault()!.mailAccounts.find((item) => item.id === message.accountId);
+        if (!account) return { error: 'Mail account not found' };
+        const token = await ensureMailToken(account);
+        const detail = await MailTmClient.getMessage(token, message.messageId);
+        const attachment = detail.attachments.find((item) => item.id === message.attachmentId);
+        if (!attachment) return { error: 'Attachment not found' };
+        const data = await MailTmClient.downloadAttachment(token, attachment.downloadUrl);
+        return {
+          data: bufferToBase64(data),
+          filename: attachment.filename,
+          contentType: attachment.contentType || 'application/octet-stream',
+        };
       } catch (error) {
         return { error: (error as Error).message };
       }

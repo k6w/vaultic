@@ -3,6 +3,7 @@ import { ArrowLeft, Check, Copy, Inbox as InboxIcon, Paperclip, RefreshCw } from
 import { useMail } from '@hooks/useMail';
 import type { MailAccount, MailMessage } from '@shared/types';
 import { Button, IconButton, Spinner, EmptyState, cn } from '@shared/ui';
+import { sendMessage } from '@shared/messages';
 
 interface InboxProps {
   accountId: string;
@@ -40,6 +41,9 @@ export default function Inbox({ accountId, account, onSelectMessage, onBack }: I
     const result = await getMessages(accountId, pageNum);
     if (pageNum === 1) {
       setMessages(result.messages);
+      if (result.messages[0]?.id) {
+        await sendMessage({ type: 'MAIL_MARK_SEEN', accountId, messageId: result.messages[0].id });
+      }
     } else {
       setMessages((prev) => [...prev, ...result.messages]);
     }

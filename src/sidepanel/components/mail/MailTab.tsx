@@ -75,6 +75,7 @@ export default function MailTab() {
             </Button>
           }
         />
+        <p className="pb-3 text-center text-[10px] text-text-muted">Inbox service provided by <a className="underline" href="https://mail.tm" target="_blank" rel="noreferrer">mail.tm</a></p>
 
         {showCreateModal && (
           <CreateMailAccount
@@ -107,6 +108,7 @@ export default function MailTab() {
             onSelect={handleSelectAccount}
             onDelete={handleDeleteAccount}
           />
+          <p className="pb-3 text-center text-[10px] text-text-muted">Inbox service provided by <a className="underline" href="https://mail.tm" target="_blank" rel="noreferrer">mail.tm</a></p>
         </>
       )}
 

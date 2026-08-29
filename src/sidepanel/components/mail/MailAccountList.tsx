@@ -63,9 +63,17 @@ export default function MailAccountList({ accounts, selectedId, onSelect, onDele
         const isConfirming = confirmDeleteId === account.id;
 
         return (
-          <button
+          <div
             key={account.id}
+            role="button"
+            tabIndex={0}
             onClick={() => onSelect(account.id)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                onSelect(account.id);
+              }
+            }}
             className={cn(
               'group w-full text-left px-3 py-2.5 flex items-center gap-3 rounded-lg transition-colors duration-150',
               isSelected ? 'bg-surface-2' : 'hover:bg-surface-hover active:bg-surface-2'
@@ -80,38 +88,49 @@ export default function MailAccountList({ accounts, selectedId, onSelect, onDele
               )}
               <p className="text-sm text-text truncate leading-tight">{account.address}</p>
             </div>
+            {!!account.unreadCount && (
+              <span className="min-w-5 rounded-full bg-accent px-1.5 py-0.5 text-center text-[10px] font-semibold text-accent-fg">
+                {Math.min(account.unreadCount, 99)}
+              </span>
+            )}
 
             {/* Arrow / Delete */}
             {isConfirming ? (
               <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                <span
+                <button
+                  type="button"
+                  aria-label="Confirm delete"
                   onClick={(e) => handleConfirmDelete(e, account.id)}
                   className="flex h-7 w-7 items-center justify-center rounded-md text-danger hover:bg-danger-soft transition-colors duration-150"
                   title="Confirm delete"
                 >
                   <Check size={14} />
-                </span>
-                <span
+                </button>
+                <button
+                  type="button"
+                  aria-label="Cancel delete"
                   onClick={handleCancelDelete}
                   className="flex h-7 w-7 items-center justify-center rounded-md text-text-muted hover:text-text hover:bg-surface-hover transition-colors duration-150"
                   title="Cancel"
                 >
                   <X size={14} />
-                </span>
+                </button>
               </div>
             ) : (
               <div className="flex items-center gap-1 flex-shrink-0">
-                <span
+                <button
+                  type="button"
+                  aria-label="Delete account"
                   onClick={(e) => handleDeleteClick(e, account.id)}
                   className="flex h-7 w-7 items-center justify-center rounded-md text-text-muted hover:text-danger hover:bg-danger-soft opacity-0 group-hover:opacity-100 transition-all duration-150"
                   title="Delete account"
                 >
                   <Trash2 size={13} />
-                </span>
+                </button>
                 <ChevronRight size={16} className="text-text-muted" />
               </div>
             )}
-          </button>
+          </div>
         );
       })}
     </div>
