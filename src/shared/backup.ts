@@ -1,16 +1,17 @@
 import { encrypt, decrypt } from './crypto';
-import type { TwoFactorAccount, Folder, MailAccount, EncryptedVault } from './types';
+import type { TwoFactorAccount, Folder, MailAccount, EncryptedVault, UserSettings } from './types';
 
 export interface BackupPayload {
   accounts: TwoFactorAccount[];
   folders: Folder[];
   mailAccounts?: MailAccount[];
+  settings?: UserSettings;
 }
 
 interface EncryptedBackupFile {
   app: 'vaultic';
   kind: 'encrypted-backup';
-  version: 1;
+  version: 1 | 2;
   createdAt: number;
   vault: EncryptedVault;
 }
@@ -25,7 +26,7 @@ export async function createEncryptedBackup(
   const file: EncryptedBackupFile = {
     app: 'vaultic',
     kind: 'encrypted-backup',
-    version: 1,
+    version: 2,
     createdAt: now,
     vault,
   };
@@ -56,5 +57,6 @@ export async function readEncryptedBackup(
     accounts: payload.accounts ?? [],
     folders: payload.folders ?? [],
     mailAccounts: payload.mailAccounts,
+    settings: payload.settings,
   };
 }

@@ -1,7 +1,6 @@
 import browser from 'webextension-polyfill';
 import { handleMessage } from './message-handler';
 import { setupContextMenu, handleContextMenuClick } from './context-menu';
-import { setupTotpAlarm, handleTotpAlarm } from './totp-alarm';
 import { handleAutoLock } from './lock-manager';
 import type { BackgroundMessage } from '@shared/types';
 
@@ -11,7 +10,8 @@ import type { BackgroundMessage } from '@shared/types';
  */
 function initialize() {
   setupContextMenu();
-  setupTotpAlarm();
+  chrome.alarms.clear('totpRefresh');
+  chrome.action.setBadgeText({ text: '' });
 }
 
 // Extension installed or updated
@@ -30,7 +30,7 @@ chrome.runtime.onStartup.addListener(() => {
 // Message handling
 browser.runtime.onMessage.addListener(
   (message: unknown, sender: browser.Runtime.MessageSender) => {
-    return handleMessage(message as BackgroundMessage, sender);
+    return handleMessage(message, sender);
   },
 );
 
@@ -38,8 +38,6 @@ browser.runtime.onMessage.addListener(
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === 'autoLock') {
     handleAutoLock();
-  } else if (alarm.name === 'totpRefresh') {
-    handleTotpAlarm();
   }
 });
 

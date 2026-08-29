@@ -15,6 +15,9 @@ export interface TwoFactorAccount {
   sortOrder?: number;
   /** Freeform secure note (e.g. recovery codes). */
   note?: string;
+  /** Exact, user-approved HTTPS origins where this account may be suggested. */
+  origins?: string[];
+  lastUsedAt?: number;
   createdAt: number;
   updatedAt: number;
 }
@@ -79,6 +82,7 @@ export interface MailAttachment {
 }
 
 export interface VaultData {
+  schemaVersion: 2;
   accounts: TwoFactorAccount[];
   mailAccounts: MailAccount[];
   folders: Folder[];
@@ -98,9 +102,17 @@ export interface UserSettings {
   /** Whether biometric/passkey quick-unlock is enabled. */
   biometricUnlock: boolean;
   listDensity: ListDensity;
+  /** Enables persistent helpers only on origins granted through optional permissions. */
+  pageIntegrationEnabled: boolean;
+  /** Block remote images and other tracking resources in email by default. */
+  blockRemoteMailContent: boolean;
+  /** Timestamp of the latest successful full backup. */
+  lastBackupAt?: number;
 }
 
 export interface EncryptedVault {
+  version?: 1 | 2;
+  kdf?: { name: 'PBKDF2-SHA256'; iterations: number };
   ciphertext: string; // base64
   salt: string;       // base64
   iv: string;         // base64
@@ -139,7 +151,8 @@ export type BackgroundMessage =
   | { type: 'VERIFY_PASSWORD'; password: string }
   | { type: 'CLEAR_ALL_DATA' }
   | { type: 'EXPORT_VAULT' }
-  | { type: 'IMPORT_ACCOUNTS'; accounts: TwoFactorAccount[] };
+  | { type: 'IMPORT_ACCOUNTS'; accounts: TwoFactorAccount[] }
+  | { type: 'IMPORT_BACKUP_DATA'; folders: Folder[]; mailAccounts: MailAccount[]; settings?: Partial<UserSettings> };
 
 // Content script messages
 export type ContentMessage =

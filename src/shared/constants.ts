@@ -16,9 +16,12 @@ export const DEFAULT_SETTINGS: UserSettings = {
   clipboardClearSeconds: 20,
   biometricUnlock: false,
   listDensity: 'comfortable',
+  pageIntegrationEnabled: false,
+  blockRemoteMailContent: true,
 };
 
 export const DEFAULT_VAULT: VaultData = {
+  schemaVersion: 2,
   accounts: [],
   mailAccounts: [],
   folders: [],
@@ -29,8 +32,9 @@ export const DEFAULT_VAULT: VaultData = {
  * Normalize a vault loaded from storage so older vaults gain new fields with
  * sensible defaults (folders array, widened settings). Non-destructive.
  */
-export function migrateVault(vault: VaultData): VaultData {
+export function migrateVault(vault: Partial<VaultData>): VaultData {
   return {
+    schemaVersion: 2,
     accounts: vault.accounts ?? [],
     mailAccounts: vault.mailAccounts ?? [],
     folders: vault.folders ?? [],

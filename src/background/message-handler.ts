@@ -6,7 +6,6 @@ import {
   getVault,
   saveVault,
   initVault,
-  getCurrentPassword,
   setCurrentPassword,
   resetAutoLockAlarm,
 } from './lock-manager';
@@ -17,6 +16,7 @@ import { generateTOTP } from '@shared/totp';
 import { MailTmClient } from '@shared/mail-api';
 import type { BackgroundMessage, MailAccount, VaultData } from '@shared/types';
 import { v4 as uuidv4 } from 'uuid';
+import { disableBiometric } from '@shared/biometric';
 
 /**
  * Ensures a mail account has a valid token. If not, refreshes it.
@@ -43,7 +43,47 @@ async function ensureMailToken(mailAccount: MailAccount): Promise<string> {
   return token;
 }
 
-export async function handleMessage(
+const CONTENT_SCRIPT_MESSAGES = new Set<BackgroundMessage['type']>([
+  'GET_SETTINGS',
+  'QR_DETECTED',
+]);
+
+const MUTATING_MESSAGES = new Set<BackgroundMessage['type']>([
+  'INIT_VAULT', 'SAVE_VAULT', 'ADD_ACCOUNT', 'UPDATE_ACCOUNT', 'DELETE_ACCOUNT',
+  'REORDER_ACCOUNTS', 'BULK_UPDATE_ACCOUNTS', 'BULK_DELETE_ACCOUNTS', 'ADD_FOLDER',
+  'UPDATE_FOLDER', 'DELETE_FOLDER', 'MAIL_CREATE_ACCOUNT', 'MAIL_DELETE_ACCOUNT',
+  'MAIL_DELETE_MESSAGE', 'UPDATE_SETTINGS', 'CHANGE_PASSWORD', 'CLEAR_ALL_DATA',
+  'IMPORT_ACCOUNTS', 'QR_DETECTED',
+  'IMPORT_BACKUP_DATA',
+]);
+
+let mutationQueue: Promise<unknown> = Promise.resolve();
+
+function isBackgroundMessage(value: unknown): value is BackgroundMessage {
+  return !!value && typeof value === 'object' && typeof (value as { type?: unknown }).type === 'string';
+}
+
+export async function handleMessage(message: unknown, sender: unknown): Promise<unknown> {
+  if (!isBackgroundMessage(message)) return { error: 'Invalid message' };
+
+  const source = sender as browser.Runtime.MessageSender | undefined;
+  if (source?.id && source.id !== browser.runtime.id) return { error: 'Unauthorized sender' };
+  if (source?.tab && !CONTENT_SCRIPT_MESSAGES.has(message.type)) {
+    return { error: 'This action is not available from a web page' };
+  }
+  if (!source?.tab && !['GET_LOCK_STATUS', 'IS_VAULT_INITIALIZED', 'UNLOCK'].includes(message.type)) {
+    resetAutoLockAlarm();
+  }
+
+  if (MUTATING_MESSAGES.has(message.type)) {
+    const operation = mutationQueue.then(() => handleMessageInternal(message, sender));
+    mutationQueue = operation.catch(() => undefined);
+    return operation;
+  }
+  return handleMessageInternal(message, sender);
+}
+
+async function handleMessageInternal(
   message: BackgroundMessage,
   _sender: unknown,
 ): Promise<unknown> {
@@ -365,11 +405,17 @@ export async function handleMessage(
 
         // Re-encrypt with new password
         const vault = getVault()!;
-        const newEncrypted = await encrypt(JSON.stringify(vault), message.newPassword);
+        const updatedVault = {
+          ...vault,
+          settings: { ...vault.settings, biometricUnlock: false },
+        };
+        const newEncrypted = await encrypt(JSON.stringify(updatedVault), message.newPassword);
         await writeEncryptedVault(newEncrypted);
 
         // Update cached password
         setCurrentPassword(message.newPassword);
+        await disableBiometric();
+        await saveVault(updatedVault);
 
         return { success: true };
       } catch {
@@ -390,6 +436,7 @@ export async function handleMessage(
 
     case 'CLEAR_ALL_DATA': {
       await clearVault();
+      await disableBiometric();
       lock();
       return { success: true };
     }
@@ -408,6 +455,27 @@ export async function handleMessage(
       const vault = getVault()!;
       const mergedAccounts = [...vault.accounts, ...message.accounts];
       await saveVault({ ...vault, accounts: mergedAccounts });
+      return { success: true };
+    }
+
+    case 'IMPORT_BACKUP_DATA': {
+      if (isLocked()) return { error: 'Vault is locked' };
+      const vault = getVault()!;
+      const folderIds = new Set(vault.folders.map((folder) => folder.id));
+      const mailIds = new Set(vault.mailAccounts.map((account) => account.id));
+      await saveVault({
+        ...vault,
+        folders: [...vault.folders, ...message.folders.filter((folder) => !folderIds.has(folder.id))],
+        mailAccounts: [
+          ...vault.mailAccounts,
+          ...message.mailAccounts.filter((account) => !mailIds.has(account.id)),
+        ],
+        settings: {
+          ...vault.settings,
+          ...(message.settings ?? {}),
+          biometricUnlock: false,
+        },
+      });
       return { success: true };
     }
 

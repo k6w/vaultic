@@ -58,6 +58,8 @@ const DEFAULT_SETTINGS: UserSettings = {
   clipboardClearSeconds: 0,
   biometricUnlock: false,
   listDensity: 'comfortable',
+  pageIntegrationEnabled: false,
+  blockRemoteMailContent: true,
 };
 
 // ── Small layout helpers ───────────────────────────────────────────────

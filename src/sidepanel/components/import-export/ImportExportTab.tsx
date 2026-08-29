@@ -368,16 +368,18 @@ export default function ImportExportTab() {
       const accounts = response.vault?.accounts ?? [];
       const folders = response.vault?.folders ?? [];
       const mailAccounts = response.vault?.mailAccounts ?? [];
+      const settings = response.vault?.settings;
       if (accounts.length === 0 && mailAccounts.length === 0 && folders.length === 0) {
         setBackupError('Nothing to back up yet.');
         return;
       }
       const json = await createEncryptedBackup(
-        { accounts, folders, mailAccounts },
+        { accounts, folders, mailAccounts, settings },
         backupPassword,
         Date.now(),
       );
       downloadFile(json, `vaultic-backup-${todayString()}.vaultic`, 'application/json');
+      await sendMessage({ type: 'UPDATE_SETTINGS', settings: { lastBackupAt: Date.now() } });
       setBackupModalOpen(false);
       setBackupPassword('');
       setBackupConfirm('');
@@ -590,7 +592,13 @@ export default function ImportExportTab() {
     setImportPasswordError(null);
     try {
       const payload = await readEncryptedBackup(pendingBackupText, importPassword);
-      await importFolders(payload.folders ?? []);
+      await sendMessage({
+        type: 'IMPORT_BACKUP_DATA',
+        folders: payload.folders ?? [],
+        mailAccounts: payload.mailAccounts ?? [],
+        settings: payload.settings,
+      });
+      await loadExistingAccounts();
       setCandidates(buildCandidates(payload.accounts ?? []));
       setPendingBackupText(null);
       setImportPassword('');

@@ -22,6 +22,7 @@ function base64ToArrayBuffer(base64: string): ArrayBuffer {
 async function deriveKey(
   password: string,
   salt: Uint8Array,
+  iterations = PBKDF2_ITERATIONS,
 ): Promise<CryptoKey> {
   const encoder = new TextEncoder();
   const keyMaterial = await crypto.subtle.importKey(
@@ -36,7 +37,7 @@ async function deriveKey(
     {
       name: 'PBKDF2',
       salt: salt.buffer.slice(salt.byteOffset, salt.byteOffset + salt.byteLength) as ArrayBuffer,
-      iterations: PBKDF2_ITERATIONS,
+      iterations,
       hash: 'SHA-256',
     },
     keyMaterial,
@@ -63,6 +64,8 @@ export async function encrypt(
   );
 
   return {
+    version: 2,
+    kdf: { name: 'PBKDF2-SHA256', iterations: PBKDF2_ITERATIONS },
     ciphertext: arrayBufferToBase64(ciphertext),
     salt: arrayBufferToBase64(salt.buffer),
     iv: arrayBufferToBase64(iv.buffer),
@@ -77,7 +80,7 @@ export async function decrypt(
   const iv = new Uint8Array(base64ToArrayBuffer(vault.iv));
   const ciphertext = base64ToArrayBuffer(vault.ciphertext);
 
-  const key = await deriveKey(password, salt);
+  const key = await deriveKey(password, salt, vault.kdf?.iterations ?? PBKDF2_ITERATIONS);
 
   const plaintext = await crypto.subtle.decrypt(
     { name: 'AES-GCM', iv },
