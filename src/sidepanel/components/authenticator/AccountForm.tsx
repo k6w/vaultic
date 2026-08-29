@@ -5,6 +5,7 @@ import { sendMessage } from '@shared/messages';
 import { parseOTPAuthURI } from '@shared/totp';
 import type { TwoFactorAccount, Folder } from '@shared/types';
 import { Modal, Input, Textarea, Field, Button, Tag, cn } from '@shared/ui';
+import { normalizeOrigin } from '@shared/accounts';
 
 interface AccountFormProps {
   account?: TwoFactorAccount;
@@ -32,6 +33,7 @@ export default function AccountForm({ account, folders, onSave, onClose }: Accou
   const [tags, setTags] = useState<string[]>(account?.tags ?? []);
   const [tagInput, setTagInput] = useState('');
   const [note, setNote] = useState(account?.note ?? '');
+  const [origins, setOrigins] = useState((account?.origins ?? []).join(', '));
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -61,6 +63,12 @@ export default function AccountForm({ account, folders, onSave, onClose }: Accou
     if (!BASE32_REGEX.test(cleanSecret))
       return 'Invalid secret key — use only letters A–Z and digits 2–7.';
     if (period < 1) return 'Period must be at least 1 second';
+    const invalidOrigin = origins
+      .split(/[\n,]/)
+      .map((value) => value.trim())
+      .filter(Boolean)
+      .find((value) => !normalizeOrigin(value));
+    if (invalidOrigin) return `Invalid site: ${invalidOrigin}. Only HTTPS sites are supported.`;
     return null;
   };
 
@@ -91,6 +99,11 @@ export default function AccountForm({ account, folders, onSave, onClose }: Accou
         folderId: folderId || undefined,
         tags: tags.length ? tags : undefined,
         note: note.trim() || undefined,
+        origins: origins
+          .split(/[\n,]/)
+          .map((value) => normalizeOrigin(value.trim()))
+          .filter((value): value is string => !!value),
+        lastUsedAt: account?.lastUsedAt,
         pinned: account?.pinned,
         sortOrder: account?.sortOrder,
         createdAt: account?.createdAt ?? now,
@@ -234,6 +247,14 @@ export default function AccountForm({ account, folders, onSave, onClose }: Accou
                   onChange={(e) => setNote(e.target.value)}
                   placeholder="Backup / recovery codes…"
                   rows={3}
+                />
+              </Field>
+              <Field label="Approved sites" hint="Exact HTTPS sites where this code may be suggested, separated by commas">
+                <Input
+                  value={origins}
+                  onChange={(event) => setOrigins(event.target.value)}
+                  placeholder="https://example.com"
+                  spellCheck={false}
                 />
               </Field>
             </div>

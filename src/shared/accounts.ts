@@ -21,3 +21,17 @@ export function matchesQuery(a: TwoFactorAccount, q: string): boolean {
     (a.tags ?? []).some((t) => t.toLowerCase().includes(query))
   );
 }
+
+export function normalizeOrigin(value: string): string | null {
+  try {
+    const url = new URL(value.includes('://') ? value : `https://${value}`);
+    return url.protocol === 'https:' ? url.origin.toLowerCase() : null;
+  } catch {
+    return null;
+  }
+}
+
+export function matchesOrigin(account: TwoFactorAccount, origin: string | null): boolean {
+  if (!origin) return false;
+  return (account.origins ?? []).some((candidate) => candidate.toLowerCase() === origin.toLowerCase());
+}

@@ -1,11 +1,10 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { PanelRight, ShieldCheck, Command as CommandIcon, Copy, Wand2, Lock } from 'lucide-react';
 import { useVault } from '@hooks/useVault';
 import { useTotp } from '@hooks/useTotp';
-import { useCountdown } from '@hooks/useCountdown';
 import { useTheme } from '@hooks/useTheme';
 import { sendMessage } from '@shared/messages';
-import { sortAccounts, matchesQuery } from '@shared/accounts';
+import { sortAccounts, matchesQuery, matchesOrigin } from '@shared/accounts';
 import { requestAutofill } from '@shared/autofill-client';
 import { copyWithClear } from '@shared/clipboard';
 import type { TwoFactorAccount } from '@shared/types';
@@ -27,17 +26,27 @@ export default function TOTPList() {
   const { vault, loading } = useVault();
   const accounts = vault?.accounts ?? [];
   const codes = useTotp(accounts);
-  const remainingSeconds = useCountdown(30);
   const { setTheme, theme } = useTheme();
   const [search, setSearch] = useState('');
   const [toast, setToast] = useState<string | null>(null);
   const [paletteOpen, setPaletteOpen] = useCommandPaletteHotkey();
+  const [activeOrigin, setActiveOrigin] = useState<string | null>(null);
   const clearSeconds = vault?.settings?.clipboardClearSeconds ?? 0;
 
-  const visible = useMemo(
-    () => sortAccounts(accounts.filter((a) => matchesQuery(a, search))),
-    [accounts, search]
-  );
+  useEffect(() => {
+    chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
+      try {
+        setActiveOrigin(tab?.url ? new URL(tab.url).origin.toLowerCase() : null);
+      } catch {
+        setActiveOrigin(null);
+      }
+    }).catch(() => setActiveOrigin(null));
+  }, []);
+
+  const visible = useMemo(() => {
+    const sorted = sortAccounts(accounts.filter((account) => matchesQuery(account, search)));
+    return sorted.sort((a, b) => Number(matchesOrigin(b, activeOrigin)) - Number(matchesOrigin(a, activeOrigin)));
+  }, [accounts, search, activeOrigin]);
 
   const flash = useCallback((msg: string) => {
     setToast(msg);
@@ -138,6 +147,9 @@ export default function TOTPList() {
       {/* Search */}
       <div className="px-4 pt-3 pb-2">
         <SearchBar value={search} onChange={setSearch} autoFocus />
+        {!search && activeOrigin && accounts.some((account) => matchesOrigin(account, activeOrigin)) && (
+          <p className="mt-2 text-[11px] text-text-muted">Suggested for this site</p>
+        )}
       </div>
 
       {/* List */}
@@ -167,8 +179,6 @@ export default function TOTPList() {
                 key={account.id}
                 account={account}
                 code={codes.get(account.id) ?? '------'}
-                remainingSeconds={remainingSeconds}
-                period={account.period}
                 clearSeconds={vault?.settings?.clipboardClearSeconds ?? 0}
                 onFill={handleFill}
               />

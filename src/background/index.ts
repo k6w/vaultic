@@ -3,6 +3,7 @@ import { handleMessage } from './message-handler';
 import { setupContextMenu, handleContextMenuClick } from './context-menu';
 import { handleAutoLock } from './lock-manager';
 import type { BackgroundMessage } from '@shared/types';
+import { syncPageIntegration, watchPageIntegrationPermissions } from './page-integration';
 
 /**
  * Initialization function shared between onInstalled and onStartup.
@@ -12,6 +13,7 @@ function initialize() {
   setupContextMenu();
   chrome.alarms.clear('totpRefresh');
   chrome.action.setBadgeText({ text: '' });
+  void syncPageIntegration();
 }
 
 // Extension installed or updated
@@ -43,5 +45,6 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
 // Context menu handling
 chrome.contextMenus.onClicked.addListener(handleContextMenuClick);
+watchPageIntegrationPermissions();
 
 console.log('Vaultic background service worker loaded');

@@ -4,6 +4,7 @@ import CountdownRing from '../../../popup/components/CountdownRing';
 import type { TwoFactorAccount, ListDensity } from '@shared/types';
 import { ServiceIcon, cn } from '@shared/ui';
 import { copyWithClear } from '@shared/clipboard';
+import { useCountdown } from '@hooks/useCountdown';
 
 function formatCode(code: string): string {
   const mid = Math.ceil(code.length / 2);
@@ -13,7 +14,6 @@ function formatCode(code: string): string {
 export interface AccountRowProps {
   account: TwoFactorAccount;
   code: string;
-  remainingSeconds: number;
   density: ListDensity;
   clearSeconds?: number;
   selectMode: boolean;
@@ -28,7 +28,6 @@ export interface AccountRowProps {
 export default function AccountRow({
   account,
   code,
-  remainingSeconds,
   density,
   clearSeconds = 0,
   selectMode,
@@ -40,6 +39,7 @@ export default function AccountRow({
   onShowQr,
 }: AccountRowProps) {
   const [copied, setCopied] = useState(false);
+  const remainingSeconds = useCountdown(account.period);
   const codeRef = useRef<HTMLSpanElement>(null);
   const compact = density === 'compact';
 

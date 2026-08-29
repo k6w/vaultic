@@ -14,7 +14,6 @@ import {
 } from 'lucide-react';
 import { useVault } from '@hooks/useVault';
 import { useTotp } from '@hooks/useTotp';
-import { useCountdown } from '@hooks/useCountdown';
 import { sendMessage } from '@shared/messages';
 import { sortAccounts, matchesQuery } from '@shared/accounts';
 import type { TwoFactorAccount, ListDensity } from '@shared/types';
@@ -38,7 +37,6 @@ export default function AuthenticatorTab() {
   );
   const density: ListDensity = vault?.settings?.listDensity ?? 'comfortable';
   const codes = useTotp(accounts);
-  const remainingSeconds = useCountdown(30);
 
   const [search, setSearch] = useState('');
   const [folderFilter, setFolderFilter] = useState<FolderFilter>('all');
@@ -297,7 +295,6 @@ export default function AuthenticatorTab() {
                   <AccountRow
                     account={account}
                     code={codes.get(account.id) ?? '------'}
-                    remainingSeconds={remainingSeconds}
                     density={density}
                     clearSeconds={vault?.settings?.clipboardClearSeconds ?? 0}
                     selectMode={selectMode}

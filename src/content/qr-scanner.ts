@@ -72,7 +72,42 @@ export async function scanPageForQRAsync(manual = false): Promise<Partial<TwoFac
     }
   }
 
+  const svgs = document.querySelectorAll('svg');
+  for (const svg of svgs) {
+    const bbox = svg.getBoundingClientRect();
+    if (bbox.width < 50 || bbox.height < 50) continue;
+    const result = await scanSVGAsync(svg);
+    if (result) results.push(result);
+  }
+
   return results;
+}
+
+async function scanSVGAsync(svg: SVGElement): Promise<Partial<TwoFactorAccount> | null> {
+  try {
+    const serialized = new XMLSerializer().serializeToString(svg);
+    const blob = new Blob([serialized], { type: 'image/svg+xml;charset=utf-8' });
+    const bitmap = await createImageBitmap(blob);
+    const result = scanBitmap(bitmap);
+    bitmap.close();
+    return result;
+  } catch {
+    return null;
+  }
+}
+
+function scanBitmap(bitmap: ImageBitmap): Partial<TwoFactorAccount> | null {
+  const maxDimension = 2048;
+  const scale = Math.min(1, maxDimension / Math.max(bitmap.width, bitmap.height));
+  const width = Math.max(1, Math.round(bitmap.width * scale));
+  const height = Math.max(1, Math.round(bitmap.height * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d');
+  if (!context) return null;
+  context.drawImage(bitmap, 0, 0, width, height);
+  return decodeQR(context.getImageData(0, 0, width, height));
 }
 
 function scanImage(img: HTMLImageElement): Partial<TwoFactorAccount> | null {
@@ -106,16 +141,9 @@ async function scanImageViaFetch(
     const blob = await response.blob();
     const bitmap = await createImageBitmap(blob);
 
-    const canvas = document.createElement('canvas');
-    canvas.width = bitmap.width;
-    canvas.height = bitmap.height;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
-
-    ctx.drawImage(bitmap, 0, 0);
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const result = scanBitmap(bitmap);
     bitmap.close();
-    return decodeQR(imageData);
+    return result;
   } catch {
     return null;
   }
@@ -177,16 +205,9 @@ export async function scanSingleImageUrl(srcUrl: string): Promise<Partial<TwoFac
     const blob = await response.blob();
     const bitmap = await createImageBitmap(blob);
 
-    const canvas = document.createElement('canvas');
-    canvas.width = bitmap.width;
-    canvas.height = bitmap.height;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
-
-    ctx.drawImage(bitmap, 0, 0);
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const result = scanBitmap(bitmap);
     bitmap.close();
-    return decodeQR(imageData);
+    return result;
   } catch {
     return null;
   }

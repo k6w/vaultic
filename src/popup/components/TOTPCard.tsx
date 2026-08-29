@@ -4,12 +4,11 @@ import CountdownRing from './CountdownRing';
 import type { TwoFactorAccount } from '@shared/types';
 import { ServiceIcon, cn } from '@shared/ui';
 import { copyWithClear } from '@shared/clipboard';
+import { useCountdown } from '@hooks/useCountdown';
 
 interface TOTPCardProps {
   account: TwoFactorAccount;
   code: string;
-  remainingSeconds: number;
-  period: number;
   /** Seconds after which the clipboard auto-clears (0 disables). */
   clearSeconds?: number;
   /** When provided, a Fill action appears on hover (autofill into page). */
@@ -24,12 +23,11 @@ function formatCode(code: string): string {
 export default function TOTPCard({
   account,
   code,
-  remainingSeconds,
-  period,
   clearSeconds = 0,
   onFill,
 }: TOTPCardProps) {
   const [copied, setCopied] = useState(false);
+  const remainingSeconds = useCountdown(account.period);
   const codeRef = useRef<HTMLSpanElement>(null);
 
   const copyToClipboard = useCallback(async () => {
@@ -119,7 +117,7 @@ export default function TOTPCard({
         >
           {formatCode(code)}
         </span>
-        <CountdownRing remainingSeconds={remainingSeconds} period={period} size={28} />
+        <CountdownRing remainingSeconds={remainingSeconds} period={account.period} size={28} />
       </div>
     </div>
   );

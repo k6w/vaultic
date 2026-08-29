@@ -9,6 +9,7 @@ import {
   ChevronRight,
   AlertTriangle,
   Trash2,
+  Globe2,
 } from 'lucide-react';
 import { sendMessage } from '@shared/messages';
 import type { UserSettings, ThemePreference, ListDensity } from '@shared/types';
@@ -100,6 +101,8 @@ export default function SettingsTab() {
   const { theme, setTheme } = useTheme();
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [loading, setLoading] = useState(true);
+  const [currentSite, setCurrentSite] = useState<string | null>(null);
+  const [currentSiteGranted, setCurrentSiteGranted] = useState(false);
   const [showPasswordChange, setShowPasswordChange] = useState(false);
   const [clearStep, setClearStep] = useState<'idle' | 'confirm' | 'type-delete'>('idle');
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
@@ -149,6 +152,32 @@ export default function SettingsTab() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    chrome.tabs.query({ active: true, currentWindow: true }).then(async ([tab]) => {
+      try {
+        const origin = tab?.url ? new URL(tab.url).origin : null;
+        if (!origin || !origin.startsWith('https://')) return;
+        const pattern = `${origin}/*`;
+        setCurrentSite(origin);
+        setCurrentSiteGranted(await chrome.permissions.contains({ origins: [pattern] }));
+      } catch {
+        setCurrentSite(null);
+      }
+    }).catch(() => setCurrentSite(null));
+  }, []);
+
+  const toggleCurrentSiteAccess = async () => {
+    if (!currentSite) return;
+    const origins = [`${currentSite}/*`];
+    const changed = currentSiteGranted
+      ? await chrome.permissions.remove({ origins })
+      : await chrome.permissions.request({ origins });
+    if (changed) {
+      setCurrentSiteGranted(!currentSiteGranted);
+      await updateSetting('pageIntegrationEnabled', !currentSiteGranted);
+    }
+  };
 
   // Save a single setting immediately
   const updateSetting = async <K extends keyof UserSettings>(key: K, value: UserSettings[K]) => {
@@ -325,13 +354,28 @@ export default function SettingsTab() {
           <Card className="space-y-4">
             <Row
               label="Auto-detect QR codes on pages"
-              hint="Spot 2FA QR codes while you browse."
+              hint="Runs only on sites you approve below."
               control={
                 <Toggle
                   checked={settings.autoDetectQR}
                   onChange={(v) => updateSetting('autoDetectQR', v)}
                   label="Auto-detect QR codes on pages"
                 />
+              }
+            />
+            <Row
+              label={currentSite ? `Access ${new URL(currentSite).hostname}` : 'Current site access'}
+              hint={currentSite ? 'Enable persistent QR detection and exact-site code suggestions.' : 'Open a regular HTTPS page to manage access.'}
+              control={
+                <Button
+                  size="sm"
+                  variant={currentSiteGranted ? 'secondary' : 'soft'}
+                  disabled={!currentSite}
+                  onClick={toggleCurrentSiteAccess}
+                >
+                  <Globe2 size={14} />
+                  {currentSiteGranted ? 'Revoke' : 'Allow'}
+                </Button>
               }
             />
             <Row
