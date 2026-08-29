@@ -35,9 +35,13 @@ export function Modal({
   hideClose,
 }: ModalProps) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  const titleId = `vaultic-dialog-title`;
+  const descriptionId = `vaultic-dialog-description`;
 
   useEffect(() => {
     if (!open) return;
+    returnFocusRef.current = document.activeElement as HTMLElement | null;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.stopPropagation();
@@ -59,6 +63,7 @@ export function Modal({
       document.removeEventListener('keydown', onKey, true);
       document.body.style.overflow = prevOverflow;
       window.clearTimeout(t);
+      returnFocusRef.current?.focus();
     };
   }, [open, onClose]);
 
@@ -69,6 +74,8 @@ export function Modal({
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
+      aria-labelledby={title ? titleId : undefined}
+      aria-describedby={description ? descriptionId : undefined}
     >
       <div
         className="absolute inset-0 bg-overlay backdrop-blur-sm animate-fade-in"
@@ -86,12 +93,12 @@ export function Modal({
           <div className="flex items-start gap-3 px-5 pt-5 pb-3">
             <div className="flex-1 min-w-0">
               {title && (
-                <h2 className="font-display text-base font-semibold text-text leading-tight">
+                <h2 id={titleId} className="font-display text-base font-semibold text-text leading-tight">
                   {title}
                 </h2>
               )}
               {description && (
-                <p className="mt-1 text-xs text-text-secondary">{description}</p>
+                <p id={descriptionId} className="mt-1 text-xs text-text-secondary">{description}</p>
               )}
             </div>
             {!hideClose && (

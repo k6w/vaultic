@@ -139,8 +139,15 @@ export default function LockScreen({ mode, onUnlocked }: LockScreenProps) {
 
       <h1 className="font-display text-xl font-semibold text-text">Vaultic</h1>
       <p className="mt-1 mb-7 text-sm text-text-secondary">
-        {mode === 'create' ? 'Create your master password' : 'Enter your master password'}
+        {mode === 'create' ? 'Create your private, local vault' : 'Enter your master password'}
       </p>
+
+      {mode === 'create' && (
+        <div className="mb-5 w-full max-w-xs rounded-lg border border-border bg-surface-1 p-3 text-xs leading-relaxed text-text-secondary">
+          <p><span className="font-medium text-text">Encrypted on this device.</span> Vaultic does not upload your codes.</p>
+          <p className="mt-1.5"><span className="font-medium text-text">No recovery service.</span> Keep this password and an encrypted backup safe.</p>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="w-full max-w-xs space-y-3">
         <div className="relative">
@@ -151,12 +158,12 @@ export default function LockScreen({ mode, onUnlocked }: LockScreenProps) {
             placeholder={mode === 'create' ? 'Create password' : 'Master password'}
             className="pr-10"
             autoFocus
+            autoComplete={mode === 'create' ? 'new-password' : 'current-password'}
           />
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
             className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text transition-colors"
-            tabIndex={-1}
             aria-label={showPassword ? 'Hide password' : 'Show password'}
           >
             {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -190,12 +197,12 @@ export default function LockScreen({ mode, onUnlocked }: LockScreenProps) {
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="Confirm password"
               className="pr-10"
+              autoComplete="new-password"
             />
             <button
               type="button"
               onClick={() => setShowConfirm(!showConfirm)}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text transition-colors"
-              tabIndex={-1}
               aria-label={showConfirm ? 'Hide password' : 'Show password'}
             >
               {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}

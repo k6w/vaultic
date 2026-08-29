@@ -1,7 +1,4 @@
 @import 'tailwindcss';
-@import '@fontsource-variable/geist/wght.css';
-@import '@fontsource-variable/space-grotesk/wght.css';
-@import '@fontsource-variable/jetbrains-mono/wght.css';
 @import './theme.css';
 
 /* Explicitly scan the whole source tree. Auto-detection was missing

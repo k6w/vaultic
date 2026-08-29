@@ -1,22 +1,6 @@
-import { useState, useMemo } from 'react';
-import {
-  ShieldCheck,
-  Mail,
-  ArrowLeftRight,
-  Settings,
-  Copy,
-  Lock,
-  Command as CommandIcon,
-} from 'lucide-react';
-import {
-  Logo,
-  ThemeToggle,
-  Tooltip,
-  CommandPalette,
-  useCommandPaletteHotkey,
-  type Command,
-  cn,
-} from '@shared/ui';
+import { useMemo, useState } from 'react';
+import { ArrowLeftRight, Command as CommandIcon, Copy, Lock, Mail, Settings, ShieldCheck } from 'lucide-react';
+import { CommandPalette, IconButton, Logo, ThemeToggle, cn, type Command, useCommandPaletteHotkey } from '@shared/ui';
 import { useVault } from '@hooks/useVault';
 import { useTotp } from '@hooks/useTotp';
 import { useTheme } from '@hooks/useTheme';
@@ -30,17 +14,11 @@ import SettingsTab from './settings/SettingsTab';
 
 type TabId = 'authenticator' | 'mail' | 'import-export' | 'settings';
 
-interface TabConfig {
-  id: TabId;
-  label: string;
-  icon: React.ReactNode;
-}
-
-const tabs: TabConfig[] = [
-  { id: 'authenticator', label: 'Authenticator', icon: <ShieldCheck size={21} /> },
-  { id: 'mail', label: 'Mail', icon: <Mail size={21} /> },
-  { id: 'import-export', label: 'Import & Export', icon: <ArrowLeftRight size={21} /> },
-  { id: 'settings', label: 'Settings', icon: <Settings size={21} /> },
+const tabs: Array<{ id: TabId; label: string; icon: React.ReactNode }> = [
+  { id: 'authenticator', label: 'Codes', icon: <ShieldCheck size={17} /> },
+  { id: 'mail', label: 'Mail', icon: <Mail size={17} /> },
+  { id: 'import-export', label: 'Data', icon: <ArrowLeftRight size={17} /> },
+  { id: 'settings', label: 'Settings', icon: <Settings size={17} /> },
 ];
 
 export default function Sidebar() {
@@ -52,93 +30,73 @@ export default function Sidebar() {
   const clearSeconds = vault?.settings?.clipboardClearSeconds ?? 0;
 
   const commands = useMemo<Command[]>(() => {
-    const accountCmds: Command[] = sortAccounts(vault?.accounts ?? []).map((a) => ({
-      id: `copy-${a.id}`,
-      title: `Copy ${a.issuer}`,
-      subtitle: a.label || undefined,
+    const accountCommands: Command[] = sortAccounts(vault?.accounts ?? []).map((account) => ({
+      id: `copy-${account.id}`,
+      title: `Copy ${account.issuer}`,
+      subtitle: account.label || undefined,
       icon: <Copy size={16} />,
-      keywords: (a.tags ?? []).join(' '),
-      run: () => copyWithClear(codes.get(a.id) ?? '', clearSeconds),
+      keywords: (account.tags ?? []).join(' '),
+      run: () => copyWithClear(codes.get(account.id) ?? '', clearSeconds),
     }));
-    const actions: Command[] = [
-      { id: 'go-auth', title: 'Go to Authenticator', icon: <ShieldCheck size={16} />, run: () => setActiveTab('authenticator') },
+    return [
+      ...accountCommands,
+      { id: 'go-auth', title: 'Go to Codes', icon: <ShieldCheck size={16} />, run: () => setActiveTab('authenticator') },
       { id: 'go-mail', title: 'Go to Mail', icon: <Mail size={16} />, run: () => setActiveTab('mail') },
-      { id: 'go-ie', title: 'Go to Import & Export', icon: <ArrowLeftRight size={16} />, run: () => setActiveTab('import-export') },
+      { id: 'go-data', title: 'Go to Data', icon: <ArrowLeftRight size={16} />, run: () => setActiveTab('import-export') },
       { id: 'go-settings', title: 'Go to Settings', icon: <Settings size={16} />, run: () => setActiveTab('settings') },
       {
-        id: 'theme',
-        title: 'Cycle theme (system / light / dark)',
-        icon: <CommandIcon size={16} />,
-        keywords: 'dark light appearance',
+        id: 'theme', title: 'Cycle theme', icon: <CommandIcon size={16} />, keywords: 'system dark light appearance',
         run: () => setTheme(theme === 'system' ? 'light' : theme === 'light' ? 'dark' : 'system'),
       },
-      { id: 'lock', title: 'Lock vault', icon: <Lock size={16} />, run: () => void sendMessage({ type: 'LOCK' }).then(() => location.reload()) },
+      {
+        id: 'lock', title: 'Lock vault', icon: <Lock size={16} />,
+        run: () => void sendMessage({ type: 'LOCK' }).then(() => location.reload()),
+      },
     ];
-    return [...accountCmds, ...actions];
   }, [vault?.accounts, codes, clearSeconds, setTheme, theme]);
 
-  const renderTabContent = () => {
-    switch (activeTab) {
-      case 'authenticator':
-        return <AuthenticatorTab />;
-      case 'mail':
-        return <MailTab />;
-      case 'import-export':
-        return <ImportExportTab />;
-      case 'settings':
-        return <SettingsTab />;
-    }
-  };
+  const content = {
+    authenticator: <AuthenticatorTab />,
+    mail: <MailTab />,
+    'import-export': <ImportExportTab />,
+    settings: <SettingsTab />,
+  }[activeTab];
 
   return (
-    <div className="flex h-full">
-      <nav className="flex flex-col items-center w-14 flex-shrink-0 bg-surface-1 border-r border-border py-3">
-        <div className="mb-3">
-          <Logo size={22} showText={false} />
+    <div className="flex h-full flex-col bg-bg">
+      <header className="flex h-13 flex-shrink-0 items-center gap-1 border-b border-border bg-surface-1 px-2">
+        <div className="mr-1 flex-shrink-0 px-1" title="Vaultic">
+          <Logo size={20} showText={false} />
         </div>
-        <div className="flex flex-col items-center gap-1">
+        <nav className="flex min-w-0 flex-1 items-center gap-0.5" aria-label="Vaultic sections">
           {tabs.map((tab) => {
-            const isActive = activeTab === tab.id;
+            const active = activeTab === tab.id;
             return (
-              <Tooltip key={tab.id} label={tab.label} side="right">
-                <button
-                  onClick={() => setActiveTab(tab.id)}
-                  aria-label={tab.label}
-                  aria-current={isActive}
-                  className={cn(
-                    'relative flex items-center justify-center h-10 w-10 rounded-lg',
-                    'transition-colors duration-150 focus-visible:outline-none',
-                    'focus-visible:ring-2 focus-visible:ring-accent/50',
-                    isActive
-                      ? 'bg-accent-soft text-accent'
-                      : 'text-text-muted hover:text-text hover:bg-surface-hover'
-                  )}
-                >
-                  {isActive && (
-                    <span className="absolute -left-3 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-accent" />
-                  )}
-                  {tab.icon}
-                </button>
-              </Tooltip>
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                aria-current={active ? 'page' : undefined}
+                title={tab.label}
+                className={cn(
+                  'flex h-9 min-w-9 items-center justify-center gap-1.5 rounded-md px-2 text-xs font-medium',
+                  'transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60',
+                  active ? 'bg-accent-soft text-accent' : 'text-text-muted hover:bg-surface-hover hover:text-text',
+                )}
+              >
+                {tab.icon}
+                <span className="hidden min-[520px]:inline">{tab.label}</span>
+              </button>
             );
           })}
-        </div>
-        <div className="mt-auto flex flex-col items-center gap-1">
-          <Tooltip label="Command palette (⌘K)" side="right">
-            <button
-              onClick={() => setPaletteOpen(true)}
-              aria-label="Command palette"
-              className="flex h-10 w-10 items-center justify-center rounded-lg text-text-muted hover:text-text hover:bg-surface-hover transition-colors"
-            >
-              <CommandIcon size={18} />
-            </button>
-          </Tooltip>
-          <ThemeToggle size="sm" />
-        </div>
-      </nav>
+        </nav>
+        <IconButton label="Command palette (Ctrl/Command K)" size="sm" onClick={() => setPaletteOpen(true)}>
+          <CommandIcon size={17} />
+        </IconButton>
+        <ThemeToggle size="sm" />
+      </header>
 
-      <div className="flex-1 min-w-0 overflow-hidden">{renderTabContent()}</div>
-
+      <main className="min-h-0 min-w-0 flex-1 overflow-hidden">{content}</main>
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} commands={commands} />
     </div>
   );

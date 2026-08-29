@@ -20,7 +20,7 @@ const variants: Record<Variant, string> = {
 };
 
 const sizes: Record<Size, string> = {
-  sm: 'h-8 px-3 text-xs rounded-md',
+  sm: 'h-9 px-3 text-xs rounded-md',
   md: 'h-10 px-4 text-sm rounded-md',
   lg: 'h-11 px-5 text-sm rounded-lg',
 };
@@ -59,9 +59,9 @@ export interface IconButtonProps extends React.ButtonHTMLAttributes<HTMLButtonEl
 }
 
 const iconSizes: Record<Size, string> = {
-  sm: 'h-8 w-8 rounded-md',
-  md: 'h-9 w-9 rounded-md',
-  lg: 'h-10 w-10 rounded-lg',
+  sm: 'h-9 w-9 rounded-md',
+  md: 'h-10 w-10 rounded-md',
+  lg: 'h-11 w-11 rounded-lg',
 };
 
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(
